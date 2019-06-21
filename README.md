@@ -1,5 +1,4 @@
 # install.sh
 
-https://forums.rocket.chat/t/rocket-chat-install-script/3560
-
+Currently wip, not recommended to try and use yet at this point.  Stay tuned :)
 
