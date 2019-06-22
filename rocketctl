@@ -778,12 +778,14 @@ do_upgrade_rocketctl(){
     if  [ $? != 0 ]; then
         print_upgrade_download_rocketctl_error_and_exit
     fi
-    if cmp -s $ROCKETCTL_DIRECTOTRY/rocketctl $ROCKETCTL_TEMP_DIRECTOTRY/rocketctl; then
-        rm $ROCKETCTL_TEMP_DIRECTOTRY/rocketctl
+    if cmp -s $ROCKETCTL_DIRECTOTRY/rocketctl /tmp/rocketctl; then
+        rm /tmp/rocketctl
+        echo "rocketctl already in latest version."
+        exit 0
     else
-        mv $ROCKETCTL_TEMP_DIRECTOTRY/rocketctl $ROCKETCTL_DIRECTOTRY/
-        chmod 755 $ROCKETCTL_TEMP_DIRECTOTRY/rocketctl
-        echo "rocketctl upgraded to latest version"
+        mv /tmp/rocketctl $ROCKETCTL_DIRECTOTRY/
+        chmod 755 $ROCKETCTL_DIRECTOTRY/rocketctl
+        echo "rocketctl upgraded to latest version."
         exit 0
     fi
 }
