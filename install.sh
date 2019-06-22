@@ -1,6 +1,6 @@
 #!/bin/bash
 
-readonly ROCKETCTL_DOWNLOAD_URL=""
+readonly ROCKETCTL_DOWNLOAD_URL="https://raw.githubusercontent.com/RocketChat/install.sh/rocketctl/rocketctl"
 readonly ROCKETCTL_DIRECTOTRY="/usr/local/bin"
 
 [ ${EUID} -ne 0 ] && echo "This script must be run as root. Cancelling" >&2; exit 1;
@@ -15,6 +15,7 @@ if [ -z $ROCKETCTL_DIRECTOTRY/rocketctl ]; then
     fi
     $ROCKETCTL_DIRECTOTRY/rocketctl install
 else
-    echo "RocketChat server already installed, use rocketctl to manage your RocketChat installation"
+    echo "You already have rocketctl installed, use rocketctl to manage your RocketChat installation."
+    echo "Run rocketctl help for more info."
     exit 1
 fi
