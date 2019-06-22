@@ -9,7 +9,7 @@ show_help(){
     cat <<EOM
 rocketctl command line tool to install and update RocketChat server
 
-Usage: $(basename "$0") [options] [--root-url=ROOT_URL --port=PORT rocket-email=EMAIL --webserver=WEBSERVER --install-node --use-mongo]
+Usage: $(basename "$0") [options] [--root-url=ROOT_URL --port=PORT rocket-email=EMAIL --webserver=WEBSERVER  --version=VERSION --install-node --use-mongo]
 Installs node, mongo, RocketChat server and optionally a webserver (Caddy or Traefik), sets up directories and permissions to use Let's Encrypt certificates.
 In case node or mongo already installed, it uses already installed versions though confirmation is required.
 For node it set $NODE_VERSION as default in your system, for mongo mmapv1 storage engine and no authentication enabled is required during installation.
@@ -27,8 +27,10 @@ FOR UNATTENDED INSTALLATION
   --port=PORT               port for the RocketChat server, default value 3000   
   --webserver=WEBSERVER     webserver to install as reverse proxy for RocketChat server, options are caddy/traefik/none, default value is none
   --rocket-email=EMAIL      e-mail address to use for SSL certificates (REQUIRED if webserver is not none)
+  --version=VERSION         RocketChat server version to install, default latest
   --install-node            in case node installed, sets node to RocketChat server recommended version, default behavoir cancel RocketChat server installation
-  --use-mongo               in case mongo installed, and storage engine configured is mmapv1, skip mongo installation but uses systems mongo for RocketChat server database, default database name rocketchat
+  --use-mongo               in case mongo installed, and storage engine configured is mmapv1, skip mongo installation but uses systems mongo for RocketChat server database, 
+                            default database name rocketchat
 
 EOM
 }
