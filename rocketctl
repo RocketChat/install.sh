@@ -139,6 +139,11 @@ print_rocketchat_not_running_error_and_exit(){
     exit 1
 }
 
+print_rocketchat_in_latest_version_and_exit(){
+    echo "RocketChat server already in latest version."
+    exit 2
+}
+
 print_done(){
     echo "Done :)"
 }
@@ -281,6 +286,9 @@ check_arguments_unattended_install() {
 apt_install_node(){
     curl -sL $NODE_DEB_DOWNLOAD_URL | bash -
     apt-get install -y build-essential nodejs graphicsmagick
+    if ! command_exists npm ; then
+        apt-get -y install npm
+    fi
 }
 
 yum_install_node(){
@@ -291,6 +299,9 @@ yum_install_node(){
 }
 
 npm_install_node(){
+    if ! command_exists npm ; then
+        apt-get -y install npm
+    fi
     npm install -g npm@$NPM_VERSION
     npm install -g inherits node-gyp@4.0.0 n && n $NODE_VERSION
 }
@@ -335,9 +346,10 @@ yum_install_mongo(){
 
 configure_mongo(){
     sed -i "s/^#  engine:/  engine: mmapv1/"  /etc/mongod.conf
-    sed -i "s/^#replication:/replication:\n  replSetName: rs01/" /etc/mongod.conf 
-    sed -i "s/^#replication:/replication:\n  replSetName: rs01/" /etc/mongod.conf 
-    sed -i "/^processManagement:/a\  fork: true" /etc/mongod.conf
+    sed -i "s/^#replication:/replication:\n  replSetName: rs01/" /etc/mongod.conf
+    if ! grep -Fq "  fork: true" /etc/mongod.conf; then
+        sed -i "/^processManagement:/a\  fork: true" /etc/mongod.conf
+    fi
 }
 
 create_mongo_systemd_file(){
@@ -643,7 +655,7 @@ do_setup(){
     fi
     # mongo
     if command_exists mongod; then
-        if [ -n $(pgrep mongod) ]; then
+        if [[ -n $(pgrep mongod) ]]; then
             mongo --eval "printjson(db.getUsers())" | grep "Error: command usersInfo requires authentication"
             if [ $? -eq 1 ]; then
                 storage=$(mongo --eval "printjson(db.serverStatus().storageEngine)" |grep name |awk -F: '{print $2}'|tr -d , |tr -d \")
@@ -701,7 +713,7 @@ do_install(){
             if [ $install_node -eq 1 ]; then
                 yum_install_node
                 npm_install_node
-            elif [ $install_node_arg -eq 1]; then
+            elif [ $install_node_arg -eq 1 ]; then
                 npm_install_node
             fi
             # mongo
@@ -709,7 +721,6 @@ do_install(){
                 yum_configure_mongo
                 yum_install_mongo
                 configure_mongo   
-                create_mongo_systemd_file
                 initiate_and_start_mongo
             fi
             ;;
@@ -745,8 +756,7 @@ do_check_updates(){
         ## todo: don't update from current to latest in certain cases, which ones?
         echo "Current update available for RocketChat server: from $current_rocketchat_version to $latest_rocketchat_version"
     elif [ $latest_rocketchat_version == $current_rocketchat_version ]; then
-        echo "RocketChat server already in latest version."
-        exit 2
+        print_rocketchat_in_latest_version_and_exit
     else
         print_check_updates_error_and_exit
     fi
