@@ -834,7 +834,7 @@ main() {
     local -r ROCKETCHAT_DIR_UPDATE="/opt/Rocket.Chat.bkup"
     local -r ROCKET_VERSION_INFO_URL="https://releases.rocket.chat/latest/info"
      
-    local -r ROCKETCTL_DOWNLOAD_URL="https://raw.githubusercontent.com/RocketChat/install.sh/rocketctl/rocketctl"
+    local -r ROCKETCTL_DOWNLOAD_URL="https://raw.githubusercontent.com/RocketChat/install.sh/master/rocketctl"
     local -r ROCKETCTL_DIRECTORY="/usr/local/bin"
     local -r ROCKETCTL_TEMP_DIRECTORY="/tmp"
     

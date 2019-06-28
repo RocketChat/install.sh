@@ -1,6 +1,6 @@
 #!/bin/bash
 
-readonly ROCKETCTL_DOWNLOAD_URL="https://raw.githubusercontent.com/RocketChat/install.sh/rocketctl/rocketctl"
+readonly ROCKETCTL_DOWNLOAD_URL="https://raw.githubusercontent.com/RocketChat/install.sh/master/rocketctl"
 readonly ROCKETCTL_DIRECTORY="/usr/local/bin"
 
 [ ${EUID} -ne 0 ] && (echo "This script must be run as root. Cancelling" >&2; exit 1;)
