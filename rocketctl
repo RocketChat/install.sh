@@ -498,6 +498,7 @@ PrivateDevices=false
 
 # allow writing of acme.json
 ReadWritePaths=/etc/traefik/acme/acme.json
+ReadWritePaths=/etc/traefik/acme
 # depending on log and entrypoint configuration, you may need to allow writing to other paths, too
 
 # limit number of processes in this unit
