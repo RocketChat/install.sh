@@ -1,0 +1,893 @@
+#!/bin/bash
+set -o nounset
+
+errcho() {
+  echo "$@" >&2
+}
+
+show_help(){
+    cat <<EOM
+rocketctl command line tool to install and update RocketChat server
+
+Usage: $(basename "$0") [options] [--root-url=ROOT_URL --port=PORT rocket-email=EMAIL --webserver=WEBSERVER  --version=VERSION --install-node --use-mongo]
+Installs node, mongo, RocketChat server and optionally a webserver (Caddy or Traefik), sets up directories and permissions to use Let's Encrypt certificates.
+In case node or mongo already installed, it uses already installed versions though confirmation is required.
+For node it set $NODE_VERSION as default in your system, for mongo mmapv1 storage engine and no authentication enabled is required during installation.
+If you wish this script to run unattended, provide extra flags to the install option, server URL is requiered (--root-url).
+
+OPTIONS
+  -h help               Display this message
+  install               Install latest RocketChat server version
+  update                Update RocketChat server from current version to latest version
+  check-updates         Check for updates of RocketChat server
+  upgrade-rocketctl     Upgrade the rocketctl command line tool                   
+
+FOR UNATTENDED INSTALLATION
+  --root-url=ROOT_URL       the public URL where RocketChat server will be accessible on the Internet (REQUIRED)
+  --port=PORT               port for the RocketChat server, default value 3000   
+  --webserver=WEBSERVER     webserver to install as reverse proxy for RocketChat server, options are caddy/traefik/none (REQUIRED)
+  --rocket-email=EMAIL      e-mail address to use for SSL certificates (REQUIRED if webserver is not none)
+  --version=VERSION         RocketChat server version to install, default latest
+  --install-node            in case node installed, sets node to RocketChat server recommended version, default behavoir cancel RocketChat server installation
+  --use-mongo               in case mongo installed, and storage engine configured is mmapv1, skip mongo installation but uses systems mongo for RocketChat server database, 
+                            default database name rocketchat
+
+EOM
+}
+
+show_short_help() {
+    errcho "Run '$(basename "$0") -h' to see the full list of available options."
+}
+
+print_run_as_root_error_and_exit(){
+    errcho "This script must be run as root. Cancelling"
+    show_short_help
+    exit 1
+}
+
+print_incorrect_parameters_error_and_exit(){
+    errcho "Incorrect parameters passed. Select one option."
+    echo -e ""
+    show_help
+    exit 2
+}
+
+error_with_no_value_specified() {
+    echo "Command line option: '--${1}' must have an assigned value."
+    show_short_help
+}
+
+print_distro_not_supported_error_and_exit(){
+    errcho "The detected Linux distribution is not supported by rocketctl."
+    exit 1
+}
+
+print_node_version_error_and_exit(){
+    errcho "Different nodejs version already exists in the system. Cancelling"
+    exit 1
+}
+
+print_use_mongo_for_rocketchat_error_and_exit(){
+    errcho "mongod already exists in the system. Cancelling"
+    exit 1
+}
+
+print_mongo_storage_engine_error_and_exit(){
+    errcho "Storage engine from previous mongo installation in your system is not mmapv1. Cancelling"
+    exit 1
+}
+print_mongo_connection_failed_error_and_exit(){
+    errcho "Connection failed to previous installed mongo in your system. Cancelling"
+    exit 1
+}
+
+print_rocketchat_installed_error_and_exit(){
+    errcho "RocketChat server already installed. Cancelling"
+    exit 1
+}
+
+print_root_url_error_and_exit(){
+    errcho "root-url must have an assigned value. Use --root-url=<URL> for unattended install. Cancelling"
+    show_short_help
+    exit 2
+}
+
+print_wrong_webserver_error_and_set_none(){
+    webserver=none
+    errcho "webserver assigned value should be traefik, caddy or none. Use --webserver=(traefik/caddy/none) for unattended install. Skipping webserver installation"
+    echo -e ""
+}
+
+print_email_error_and_exit(){
+    errcho "rocket-mail must have an assigned value if decided to install webserver $webserver. Cancelling"
+    show_short_help
+    exit 2
+}
+
+print_check_updates_error_and_exit(){
+    errcho "Could not determine if updates available for RocketChat server."
+    exit 1
+}
+
+print_update_install_failed_error_and_exit(){
+    errcho "Something went wrong backing up current RocketChat server version before update. Cancelling"
+    exit 1
+}
+
+print_upgrade_download_rocketctl_error_and_exit(){
+    errcho "Error downloading rocketctl. Cancelling"
+    exit 1
+}
+
+print_update_install_failed_exit(){
+    errcho "Error in updated RocketChat server health check, restoring backup."
+    exit 1
+}
+
+print_update_backup_failed_exit(){
+    errcho "Update failed, can't get RocketChat server API in port $PORT. Cancelling"
+    exit 1
+}
+
+print_download_traefik_error_and_exit(){
+    errcho "Error downloading traefik. Cancelling"
+    exit 1
+}
+
+print_rocketchat_not_running_error_and_exit(){
+    errcho "RocketChat server not running. Cancelling"
+    exit 1
+}
+
+print_rocketchat_in_latest_version_and_exit(){
+    echo "RocketChat server already in latest version."
+    exit 2
+}
+
+print_done(){
+    echo "Done :)"
+}
+
+command_exists() {
+    command -v "$@" > /dev/null 2>&1
+}
+
+get_os_distro(){
+    if [ -r /etc/os-release ]; then
+        distro="$(. /etc/os-release && echo "$ID")"
+        distro_version="$(. /etc/os-release && echo "$VERSION_ID")"
+    fi
+}
+
+os_supported(){
+    get_os_distro
+    case "$distro" in
+        ubuntu)
+            [[ "$distro_version" =~ (("18.04"|"19.04")) ]] || print_distro_not_supported_error_and_exit
+            ;;
+        debian)
+            [[ "$distro_version" == "9" ]] || print_distro_not_supported_error_and_exit
+            ;;
+        centos)
+            [[ "$distro_version" == "7" ]] || print_distro_not_supported_error_and_exit
+            ;;
+        *)
+            print_distro_not_supported_error_and_exit
+            ;;
+    esac
+}
+
+interactive_node(){
+    if [ ${install_node_arg} -eq 0 ]; then
+        read -r -p "Your current node version is $node_version. RocketChat server uses node $NODE_VERSION.
+If you decide to continue, node will be installed using npm and it will become your default system node version.
+Do you want to install node anyway and use it system wide? (y/n) " install_node_answer
+        echo -e ""
+        [ "${install_node_answer}" == 'y' ] && install_node_arg=1 || print_node_version_error_and_exit
+    fi   
+}
+
+interactive_mongo(){
+    if [ ${use_mongo_arg} -eq 0 ]; then
+        read -r -p "It appears you already have mongo installed, this script will skip mongo installation but can't assure successful RocketChat server installation.
+Database name for RocketChat server will be rocketchat.
+Would you like to use your mongo installation for the RocketChat server database? (y/n) " use_mongo_answer
+        echo -e ""
+        [ ${use_mongo_answer} == 'y' ] && use_mongo_arg=1 || print_use_mongo_for_rocketchat_error_and_exit
+    fi
+}
+
+interactive_rocketchat(){
+    if [ -z "${ROOT_URL}" ]; then
+        read -r -p "Enter ROOT_URL for your RocketChat server installation (for example https://www.mydomain.com) : " ROOT_URL
+        echo -e ""
+    fi
+    [ -z ${ROOT_URL} ] && print_root_url_error_and_exit
+    ROOT_URL=$(echo "$ROOT_URL" | tr '[:upper:]' '[:lower:]')
+}
+
+interactive_webserver(){
+    if [ ${webserver_arg} -eq 0 ]; then
+        read -r -p "Select a webserver to use as a reverse proxy for your RocketChat server installation [none]: (traefik/caddy/none) " webserver
+        echo -e ""
+    fi
+    webserver=$(echo "$webserver" | tr '[:upper:]' '[:lower:]')
+    ! [[ ${webserver} =~ ((traefik)|(caddy)|(none)) ]] && print_wrong_webserver_error_and_set_none
+}
+
+interactive_mail(){
+    if [ ${webserver} != "none" ]; then
+        if [ -z "${rocket_mail_arg}" ]; then
+            read -r -p "Enter e-mail for Let's Encrypt certificates: " rocket_mail
+            echo -e ""
+        fi
+        [ -z ${rocket_mail} ] && print_email_error_and_exit
+        rocket_mail=$(echo "$rocket_mail" | tr '[:upper:]' '[:lower:]')
+    fi
+}
+
+check_arguments_unattended_install() {
+    while [ $# -gt 0 ]; do
+        IFS='=' read -r -a args <<< $1
+        case "${args[0]}" in
+            --install-node)
+                install_node_arg=1
+                ;;
+            --use-mongo)
+                use_mongo_arg=1
+                ;;
+            --webserver)
+                if [ ${#args[@]} -ne 2 ]; then
+                    error_with_no_value_specified "${args[0]}"
+                    exit 2
+                fi
+                webserver="${args[1]}"
+                webserver_arg=1
+                ;;
+            --rocket-email)
+                if [ ${#args[@]} -ne 2 ]; then
+                    error_with_no_value_specified "${args[0]}"
+                    exit 2
+                fi
+                rocket_mail="${args[1]}"
+                rocket_mail_arg=1
+                ;;
+            --root-url)
+                if [ ${#args[@]} -ne 2 ]; then
+                    error_with_no_value_specified "${args[0]}"
+                    exit 2
+                fi
+                ROOT_URL="${args[1]}"
+                ;;
+            --port)
+                if [ ${#args[@]} -ne 2 ]; then
+                    error_with_no_value_specified "${args[0]}"
+                    exit 2
+                fi
+                PORT="${args[1]}"
+                ;;
+            --version)
+                if [ ${#args[@]} -ne 2 ]; then
+                    error_with_no_value_specified "${args[0]}"
+                    exit 2
+                fi
+                VERSION="${args[1]}"
+                ROCKETCHAT_DOWNLOAD_URL="https://releases.rocket.chat/$VERSION/download"
+                ;;
+            *)
+                show_help
+                exit 2
+                ;;
+        esac
+    shift
+    done
+}  
+
+apt_install_node(){
+    curl -sL $NODE_DEB_DOWNLOAD_URL | bash -
+    apt-get install -y build-essential graphicsmagick
+    apt-get install -y nodejs=8.16.0-1nodesource1
+}
+
+yum_install_node(){
+    curl -sL $NODE_RPM_DOWNLOAD_URL | bash - 
+    yum install -y gcc-c++ make nodejs
+    yum install -y epel-release
+    yum install -y GraphicsMagick
+}
+
+npm_install_node(){
+    if [ "$distro_version" == "19.04" ]; then
+        curl -sL $NODE_DEB_DOWNLOAD_URL | bash -
+        apt-get install -y --allow-downgrades nodejs=8.16.0-1nodesource1
+    fi
+    npm install -g npm@$NPM_VERSION
+    npm install -g inherits node-gyp@4.0.0 n && n $NODE_VERSION
+}
+
+apt_configure_mongo(){
+    local deb_keyserver="hkp://keyserver.ubuntu.com:80"
+    local deb_key="9DA31620334BD75D9DCB49F368818C72E52529D4"
+    local ubuntu_mongo_url="deb [ arch=amd64 ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/4.0 multiverse"
+    local debian_mongo_url="deb http://repo.mongodb.org/apt/debian stretch/mongodb-org/4.0 main"
+
+    if [ "$distro" == "ubuntu" ]; then
+        apt-key adv --keyserver $deb_keyserver --recv $deb_key
+        echo $ubuntu_mongo_url | tee /etc/apt/sources.list.d/mongodb-org-4.0.list
+    elif [ "$distro" == "debian" ]; then
+        apt-get install -y dirmngr libcap2-bin
+        apt-key adv --keyserver $deb_keyserver --recv $deb_key
+        echo $debian_mongo_url | tee /etc/apt/sources.list.d/mongodb-org-4.0.list
+    fi
+}
+
+yum_configure_mongo(){
+    local yum_mongo_url="https://repo.mongodb.org/yum/redhat/7/mongodb-org/4.0/x86_64/"
+    local yum_key="https://www.mongodb.org/static/pgp/server-4.0.asc"
+    cat << EOF | tee -a /etc/yum.repos.d/mongodb-org-4.0.repo
+[mongodb-org-4.0]
+name=MongoDB Repository
+baseurl=$yum_mongo_url
+gpgcheck=1
+enabled=1
+gpgkey=$yum_key
+EOF
+}
+
+apt_install_mongo(){
+    apt-get update
+    apt-get install -y mongodb-org
+}
+
+yum_install_mongo(){
+    yum install -y mongodb-org
+}
+
+configure_mongo(){
+    sed -i "s/^#  engine:/  engine: mmapv1/"  /etc/mongod.conf
+    sed -i "s/^#replication:/replication:\n  replSetName: rs01/" /etc/mongod.conf
+    if ! grep -Fq "  fork: true" /etc/mongod.conf; then
+        sed -i "/^processManagement:/a\  fork: true" /etc/mongod.conf
+    fi
+}
+
+create_mongo_systemd_file(){
+    mkdir /etc/systemd/system/mongod.service.d/
+    cat << EOF | tee -a /etc/systemd/system/mongod.service.d/mongod.conf
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+EOF
+}
+
+initiate_and_start_mongo(){
+    systemctl daemon-reload
+    systemctl enable mongod
+    systemctl start mongod
+    if [ -n $(pgrep mongod) ]; then
+        mongo --eval "printjson(rs.initiate())"
+    fi
+}
+
+install_rocketchat(){
+    curl -L $ROCKETCHAT_DOWNLOAD_URL -o /tmp/rocket.chat.tgz
+    tar -xzf /tmp/rocket.chat.tgz -C /tmp
+    cd /tmp/bundle/programs/server && npm install
+    # add npm install node-gyp@5.0.1 to fix 4 moderate severity vulnerabilities
+    mv /tmp/bundle $ROCKETCHAT_DIR
+    rm /tmp/rocket.chat.tgz
+}
+
+set_rocketchat_user_and_permissions(){
+    id -un rocketchat 1>/dev/null 2>&1
+    if [ $? -ne 0 ] ; then
+        useradd -M rocketchat && usermod -L rocketchat
+    fi
+    chown -R rocketchat:rocketchat $ROCKETCHAT_DIR
+}
+
+create_rocketchat_systemd_file(){
+    if [[ $webserver != "none" ]]; then
+        BIND_IP="127.0.0.1"
+    fi
+    cat << EOF | tee -a /lib/systemd/system/rocketchat.service
+[Unit]
+Description=The Rocket.Chat server
+After=network.target remote-fs.target nss-lookup.target nginx.target mongod.service
+[Service]
+ExecStart=/usr/local/bin/node /opt/Rocket.Chat/main.js
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=rocketchat
+User=rocketchat
+Environment=MONGO_URL=$MONGO_URL
+Environment=MONGO_OPLOG_URL=$MONGO_OPLOG_URL
+Environment=ROOT_URL=$ROOT_URL
+Environment=PORT=$PORT
+Environment=BIND_IP=$BIND_IP
+[Install]
+WantedBy=multi-user.target
+EOF
+}
+
+start_rocketchat(){
+    systemctl daemon-reload
+    systemctl enable rocketchat
+    systemctl start rocketchat
+}
+
+get_rocketchat_domain(){
+    rocket_domain=$(echo $ROOT_URL | awk -F[/:] '{print $4}')
+}
+
+traefik_config_file(){
+    cat << EOF | tee -a /etc/traefik/traefik.toml
+defaultEntryPoints = ["https","http"]
+
+[entryPoints]
+  [entryPoints.http]
+  address = ":80"
+    [entryPoints.http.redirect]
+      entryPoint = "https"
+  [entryPoints.https]
+  address = ":443"
+    [entryPoints.https.tls]
+
+[file]
+
+[backends]
+  [backends.rocketchat]
+    [backends.rocketchat.servers.server1]
+       url = "http://localhost:$PORT"
+
+[frontends]
+  [frontends.rocketchat]
+      backend = "rocketchat"
+      passHostHeader = true
+      [frontends.rocketchat.routes.route0]
+          rule = "Host:$rocket_domain"
+
+[acme]
+email = "$rocket_mail"
+storage = "etc/traefik/acme/acme.json"
+caServer = "https://acme-staging-v02.api.letsencrypt.org/directory"
+entryPoint = "https"
+  [acme.httpChallenge]
+  entryPoint = "http"
+
+[[acme.domains]]
+  main = "$rocket_domain"
+EOF
+}
+
+## todo comment which ones to work? 
+traefik_systemd_file(){
+    cat << EOF | tee -a /lib/systemd/system/traefik.service
+[Unit]
+Description=Traefik
+Documentation=https://docs.traefik.io
+After=network-online.target
+AssertFileIsExecutable=/usr/local/bin/traefik
+AssertPathExists=/etc/traefik/traefik.toml
+
+[Service]
+User=traefik
+Group=traefik
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+
+# configure service behavior
+Type=notify
+ExecStart=/usr/local/bin/traefik --configFile=/etc/traefik/traefik.toml
+Restart=on-abnormal
+WatchdogSec=1s
+
+# lock down system access
+# prohibit any operating system and configuration modification
+ProtectSystem=full
+# create separate, new (and empty) /tmp and /var/tmp filesystems
+PrivateTmp=true
+# make /home directories inaccessible
+ProtectHome=true
+# turns off access to physical devices (/dev/...)
+PrivateDevices=false
+# make kernel settings (procfs and sysfs) read-only
+#ProtectKernelTunables=true
+# make cgroups /sys/fs/cgroup read-only
+#ProtectControlGroups=true
+
+# allow writing of acme.json
+ReadWritePaths=/etc/traefik/acme/acme.json
+ReadWritePaths=/etc/traefik/acme
+# depending on log and entrypoint configuration, you may need to allow writing to other paths, too
+
+# limit number of processes in this unit
+#LimitNPROC=1
+
+[Install]
+WantedBy=multi-user.target
+EOF
+}
+
+install_traefik(){
+    curl -L $TRAEFIK_DOWNLOAD_URL -o /tmp/traefik
+    if [[ $? == 0 ]]; then
+        mv /tmp/traefik /usr/local/bin/
+    else
+        print_download_traefik_error_and_exit
+    fi
+    useradd -r -s /bin/false -U -M traefik
+    chown root:root /usr/local/bin/traefik
+    chmod 755 /usr/local/bin/traefik
+    setcap 'cap_net_bind_service=+ep' /usr/local/bin/traefik
+    mkdir /etc/traefik
+    mkdir /etc/traefik/acme
+    touch /etc/traefik/acme/acme.json
+    chown -R root:root /etc/traefik
+    chown -R traefik:traefik /etc/traefik/acme
+    chmod 600 /etc/traefik/acme/acme.json
+    
+    get_rocketchat_domain
+    traefik_config_file
+    chown root:root /etc/traefik/traefik.toml
+    chmod 644 /etc/traefik/traefik.toml
+    
+    traefik_systemd_file
+    chown root:root /lib/systemd/system/traefik.service
+    chmod 644 /lib/systemd/system/traefik.service
+    systemctl daemon-reload
+    systemctl enable traefik.service
+    systemctl start traefik.service
+}
+
+caddy_config_file(){
+    cat << EOF | tee -a /etc/caddy/Caddyfile
+$ROOT_URL
+proxy / localhost:$PORT {
+  websocket
+  transparent
+}
+EOF
+}
+
+caddy_systemd_file(){
+    cat << EOF | tee -a /lib/systemd/system/caddy.service
+[Unit]
+Description=Caddy HTTP/2 web server
+Documentation=https://caddyserver.com/docs
+After=network-online.target
+Wants=network-online.target systemd-networkd-wait-online.service
+
+[Service]
+Restart=on-abnormal
+
+; User and group the process will run as.
+User=caddy
+Group=caddy
+
+; Letsencrypt-issued certificates will be written to this directory.
+Environment=CADDYPATH=/etc/caddy/ssl
+
+; Always set "-root" to something safe in case it gets forgotten in the Caddyfile.
+ExecStart=/usr/local/bin/caddy -log stdout -agree=true -conf=/etc/caddy/Caddyfile -ca=https://acme-staging-v02.api.letsencrypt.org/directory -email=$rocket_mail
+ExecReload=/bin/kill -USR1 \$MAINPID
+
+; Use graceful shutdown with a reasonable timeout
+KillMode=mixed
+KillSignal=SIGQUIT
+TimeoutStopSec=5s
+
+; Limit the number of file descriptors.
+LimitNOFILE=1048576
+; Unmodified caddy is not expected to use more than that.
+LimitNPROC=512
+
+; Use private /tmp and /var/tmp, which are discarded after caddy stops.
+PrivateTmp=true
+; Use a minimal /dev (May bring additional security if switched to 'true', but it may not work on Raspberry Pi's or other devices, so it has been disabled in this dist.)
+PrivateDevices=false
+; Hide /home, /root, and /run/user. Nobody will steal your SSH-keys.
+ProtectHome=true
+; Make /usr, /boot, /etc and possibly some more folders read-only.
+ProtectSystem=full
+; … except /etc/ssl/caddy, because we want Letsencrypt-certificates there.
+;   This merely retains r/w access rights, it does not add any new. Must still be writable on the host!
+ReadWriteDirectories=/etc/caddy/ssl
+
+; The following additional security directives only work with systemd v229 or later.
+; They further restrict privileges that can be gained by caddy. Uncomment if you like.
+; Note that you may have to add capabilities required by any plugins in use.
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+;NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
+EOF
+}
+
+install_caddy(){
+    curl -L $CADDY_DOWNLOAD_URL -o /tmp/caddy.tar.gz
+    tar -xzf /tmp/caddy.tar.gz -C /tmp
+    mv /tmp/caddy /usr/local/bin
+    rm /tmp/caddy.tar.gz
+    chown root:root /usr/local/bin/caddy
+    chmod 755 /usr/local/bin/caddy
+    setcap cap_net_bind_service=+ep $(which caddy)
+    mkdir /etc/caddy
+    mkdir /etc/caddy/ssl
+    chown -R root:root /etc/caddy
+    useradd -r -s /bin/false -U -M caddy
+    chown -R caddy:caddy /etc/caddy/ssl
+
+    caddy_config_file
+    chown root:root /etc/caddy/Caddyfile
+    chmod 644 /etc/caddy/Caddyfile
+    
+    caddy_systemd_file
+    chown root:root /lib/systemd/system/caddy.service
+    chmod 644 /lib/systemd/system/caddy.service
+    systemctl daemon-reload
+    systemctl enable caddy.service
+    systemctl start caddy.service
+}
+
+get_rocketchat_latest_version(){
+    latest_rocketchat_version=$(curl $ROCKET_VERSION_INFO_URL 2>/dev/null |grep -w tag |awk -F: '{print $2}'|tr -d , |tr -d \")
+}
+
+get_rocketchat_current_version(){
+    if systemctl status rocketchat > /dev/null 2>&1; then
+        PORT=$(cat /lib/systemd/system/rocketchat.service |grep PORT |awk -F= '{print $3}')
+        current_rocketchat_version=$(curl http://localhost:$PORT/api/info 2>/dev/null |cut -d\" -f4)
+    else
+        print_rocketchat_not_running_error_and_exit
+    fi
+}
+
+version_gt() { 
+    test "$(printf '%s\n' "$@" | sort -V | head -n 1)" != "$1"
+}
+
+rocketchat_health_check(){
+    local count=0
+    while ! ([ $rocket_healthy -eq  1 ] || [ $count -eq 15 ]); do
+        get_rocketchat_current_version
+        [[ $current_rocketchat_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] && rocket_healthy=1
+        sleep 2
+        ((count++))
+        echo "Waiting until 30 seconds for RocketChat server to be active ... $(($count * 2))"
+    done
+}
+
+do_setup(){
+    # checks system before install: node, mongo, rocketchat
+    # assigns user's values
+    # node
+    if command_exists node;  then
+        node_version=$(node --version 2>/dev/null)
+        if [ "$node_version" != "$NODE_VERSION" ]; then
+            interactive_node
+        fi
+    else
+        install_node=1
+    fi
+    # mongo
+    if command_exists mongod; then
+        if [[ -n $(pgrep mongod) ]]; then
+            mongo --eval "printjson(db.getUsers())" | grep "Error: command usersInfo requires authentication"
+            if [ $? -eq 1 ]; then
+                storage=$(mongo --eval "printjson(db.serverStatus().storageEngine)" |grep name |awk -F: '{print $2}'|tr -d , |tr -d \")
+                if [ $storage == "mmapv1" ]; then
+                    interactive_mongo
+                else
+                    print_mongo_storage_engine_error_and_exit
+                fi
+            else
+                print_mongo_connection_failed_error_and_exit
+            fi
+        else
+            print_mongo_connection_failed_error_and_exit    
+        fi
+    else
+        install_mongo=1
+    fi
+    # rocketchat
+    systemctl status rocketchat > /dev/null 2>&1
+    if [ $? -eq 4 ]; then
+        interactive_rocketchat
+    else
+        print_rocketchat_installed_error_and_exit
+    fi
+    # webserver
+    interactive_webserver
+    interactive_mail
+}
+
+do_install(){
+    case "$distro" in
+        ubuntu|debian)
+            apt-get -y update
+            apt-get install -y curl
+            # node
+            if [ $install_node -eq 1 ]; then
+                apt_install_node
+                npm_install_node
+            elif [ $install_node_arg -eq 1 ]; then
+                npm_install_node
+            fi
+            # mongo
+            if [ $install_mongo -eq 1 ]; then
+                apt_configure_mongo
+                apt_install_mongo
+                configure_mongo   
+                create_mongo_systemd_file
+                initiate_and_start_mongo
+            fi
+            ;;
+        centos)
+            yum -y check-update
+            yum install -y curl
+            # node
+            if [ $install_node -eq 1 ]; then
+                yum_install_node
+                npm_install_node
+            elif [ $install_node_arg -eq 1 ]; then
+                npm_install_node
+            fi
+            # mongo
+            if [ $install_mongo -eq 1 ]; then
+                yum_configure_mongo
+                yum_install_mongo
+                configure_mongo   
+                initiate_and_start_mongo
+            fi
+            ;;
+        *)
+            print_distro_not_supported_error_and_exit
+            ;;
+    esac
+    # rocketchat
+    if ! [ -d ${ROCKETCHAT_DIR} ]; then
+        install_rocketchat
+        set_rocketchat_user_and_permissions
+        create_rocketchat_systemd_file
+        start_rocketchat
+    else
+        print_rocketchat_installed_error_and_exit
+    fi
+    # webserver
+    case "$webserver" in
+        traefik)
+            install_traefik
+            ;;
+        caddy)
+            install_caddy
+            ;;
+    esac
+    print_done
+}
+        
+do_check_updates(){
+    get_rocketchat_latest_version
+    get_rocketchat_current_version
+    if version_gt $latest_rocketchat_version $current_rocketchat_version; then
+        ## todo: don't update from current to latest in certain cases, which ones?
+        echo "Current update available for RocketChat server: from $current_rocketchat_version to $latest_rocketchat_version"
+    elif [ $latest_rocketchat_version == $current_rocketchat_version ]; then
+        print_rocketchat_in_latest_version_and_exit
+    else
+        print_check_updates_error_and_exit
+    fi
+}                
+
+do_update(){
+    mv $ROCKETCHAT_DIR $ROCKETCHAT_DIR_UPDATE
+    if [ $? == 0 ]; then
+        systemctl stop rocketchat
+        install_rocketchat
+        systemctl start rocketchat
+        rocketchat_health_check
+        if [ $rocket_healthy -eq 1 ]; then
+            rm -rf $ROCKETCHAT_DIR_UPDATE
+            echo "RocketChat server updated to latest version :)"
+            exit 0
+        else
+            rm -rf $ROCKETCHAT_DIR && mv $ROCKETCHAT_DIR_UPDATE $ROCKETCHAT_DIR
+            systemctl restart rocketchat
+            print_update_install_failed_exit
+        fi
+    else
+        print_update_backup_failed_exit
+    fi
+}
+
+do_upgrade_rocketctl(){
+    curl -L $ROCKETCTL_DOWNLOAD_URL -o /tmp/rocketctl
+    if  [ $? != 0 ]; then
+        print_upgrade_download_rocketctl_error_and_exit
+    fi
+    if cmp -s $ROCKETCTL_DIRECTORY/rocketctl /tmp/rocketctl; then
+        rm /tmp/rocketctl
+        echo "rocketctl already in latest version."
+        exit 0
+    else
+        mv /tmp/rocketctl $ROCKETCTL_DIRECTORY/
+        chmod 755 $ROCKETCTL_DIRECTORY/rocketctl
+        echo "rocketctl upgraded to latest version."
+        exit 0
+    fi
+}
+
+main() {
+
+    local VERSION="latest"
+    local -r NODE_VERSION="v8.11.4"
+    local -r NPM_VERSION="6.4.1"
+    local -r MONGO_URL="mongodb://localhost:27017/rocketchat?replicaSet=rs01"
+    local -r MONGO_OPLOG_URL="mongodb://localhost:27017/local?replicaSet=rs01"
+     
+    local ROCKETCHAT_DOWNLOAD_URL="https://releases.rocket.chat/$VERSION/download"
+    local -r NODE_DEB_DOWNLOAD_URL="https://deb.nodesource.com/setup_8.x"
+    local -r NODE_RPM_DOWNLOAD_URL="https://rpm.nodesource.com/setup_8.x"
+    local -r ROCKETCHAT_DIR="/opt/Rocket.Chat"
+    local -r ROCKETCHAT_DIR_UPDATE="/opt/Rocket.Chat.bkup"
+    local -r ROCKET_VERSION_INFO_URL="https://releases.rocket.chat/latest/info"
+     
+    local -r ROCKETCTL_DOWNLOAD_URL="https://raw.githubusercontent.com/RocketChat/install.sh/master/rocketctl"
+    local -r ROCKETCTL_DIRECTORY="/usr/local/bin"
+    local -r ROCKETCTL_TEMP_DIRECTORY="/tmp"
+    
+    local -r TRAEFIK_DOWNLOAD_URL="https://github.com/containous/traefik/releases/download/v1.7.12/traefik"
+    local -r CADDY_DOWNLOAD_URL="https://github.com/mholt/caddy/releases/download/v1.0.0/caddy_v1.0.0_linux_amd64.tar.gz"
+    
+    local distro=""
+    local distro_version=""
+    local install_node=0
+    local install_mongo=0
+    local rocket_healthy=0
+
+    local ROOT_URL=""
+    local PORT=3000
+    local BIND_IP="0.0.0.0"
+    local webserver=none
+    local install_node_arg=0
+    local use_mongo_arg=0
+    local webserver_arg=0
+    local rocket_mail_arg=""
+    local rocket_domain=""
+    
+    [ ${EUID} -ne 0 ] && print_run_as_root_error_and_exit
+    [ $# -lt 1 ] && print_incorrect_parameters_error_and_exit
+    case $1 in
+        --help|-h)
+            show_help
+            ;;
+        install)
+            os_supported
+            shift
+            check_arguments_unattended_install $@
+            do_setup
+            do_install
+            ;;
+        check-updates)
+            do_check_updates
+            ;;
+        update)
+            os_supported
+            if do_check_updates; then
+                do_update            
+            fi
+            ;;
+        upgrade-rocketctl)
+            do_upgrade_rocketctl
+            ;;
+        *)
+            show_help
+            exit 2
+            ;;
+    esac
+
+}
+
+main "$@"
