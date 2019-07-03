@@ -46,7 +46,7 @@ print_run_as_root_error_and_exit(){
 }
 
 print_input_from_pipe_error_and_exit(){
-    errcho "This script is interactive, please run: bash -c \"\$(curl https://rocketchat.github.io/beta-install.sh)\""
+    errcho "This script is interactive, it can't be run with stdin piped"
     exit 1
 }
 
