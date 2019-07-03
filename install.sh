@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #readonly ROCKETCHATCTL_DOWNLOAD_URL="https://raw.githubusercontent.com/RocketChat/install.sh/master/rocketchatctl"
-readonly ROCKETCHATCTL_DOWNLOAD_URL="https://github.com/RocketChat/install.sh/blob/rocketchatctl-rename/rocketchatctl"
+readonly ROCKETCHATCTL_DOWNLOAD_URL="https://raw.githubusercontent.com/RocketChat/install.sh/rocketchatctl-rename/rocketchatctl"
 readonly ROCKETCHATCTL_DIRECTORY="/usr/local/bin"
 
 if [ ${EUID} -ne 0 ]; then
