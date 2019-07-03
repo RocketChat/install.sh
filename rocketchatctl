@@ -7,7 +7,7 @@ errcho() {
 
 show_help(){
     cat <<EOM
-rocketctl command line tool to install and update RocketChat server
+rocketchatctl command line tool to install and update RocketChat server
 
 Usage: $(basename "$0") [options] [--root-url=ROOT_URL --port=PORT rocket-email=EMAIL --webserver=WEBSERVER  --version=VERSION --install-node --use-mongo]
 Installs node, mongo, RocketChat server and optionally a webserver (Caddy or Traefik), sets up directories and permissions to use Let's Encrypt certificates.
@@ -20,7 +20,7 @@ OPTIONS
   install               Install latest RocketChat server version
   update                Update RocketChat server from current version to latest version
   check-updates         Check for updates of RocketChat server
-  upgrade-rocketctl     Upgrade the rocketctl command line tool                   
+  upgrade-rocketchatctl     Upgrade the rocketchatctl command line tool                   
 
 FOR UNATTENDED INSTALLATION
   --root-url=ROOT_URL       the public URL where RocketChat server will be accessible on the Internet (REQUIRED)
@@ -45,6 +45,11 @@ print_run_as_root_error_and_exit(){
     exit 1
 }
 
+print_input_from_pipe_error_and_exit(){
+    errcho "This script is interactive, please run: bash -c \"\$(curl https://rocketchat.github.io/beta-install.sh)\""
+    exit 1
+}
+
 print_incorrect_parameters_error_and_exit(){
     errcho "Incorrect parameters passed. Select one option."
     echo -e ""
@@ -58,7 +63,7 @@ error_with_no_value_specified() {
 }
 
 print_distro_not_supported_error_and_exit(){
-    errcho "The detected Linux distribution is not supported by rocketctl."
+    errcho "The detected Linux distribution is not supported by rocketchatctl."
     exit 1
 }
 
@@ -114,8 +119,8 @@ print_update_install_failed_error_and_exit(){
     exit 1
 }
 
-print_upgrade_download_rocketctl_error_and_exit(){
-    errcho "Error downloading rocketctl. Cancelling"
+print_upgrade_download_rocketchatctl_error_and_exit(){
+    errcho "Error downloading rocketchatctl. Cancelling"
     exit 1
 }
 
@@ -802,19 +807,19 @@ do_update(){
     fi
 }
 
-do_upgrade_rocketctl(){
-    curl -L $ROCKETCTL_DOWNLOAD_URL -o /tmp/rocketctl
+do_upgrade_rocketchatctl(){
+    curl -L $ROCKETCHATCTL_DOWNLOAD_URL -o /tmp/rocketchatctl
     if  [ $? != 0 ]; then
-        print_upgrade_download_rocketctl_error_and_exit
+        print_upgrade_download_rocketchatctl_error_and_exit
     fi
-    if cmp -s $ROCKETCTL_DIRECTORY/rocketctl /tmp/rocketctl; then
-        rm /tmp/rocketctl
-        echo "rocketctl already in latest version."
+    if cmp -s $ROCKETCHATCTL_DIRECTORY/rocketchatctl /tmp/rocketchatctl; then
+        rm /tmp/rocketchatctl
+        echo "rocketchatctl already in latest version."
         exit 0
     else
-        mv /tmp/rocketctl $ROCKETCTL_DIRECTORY/
-        chmod 755 $ROCKETCTL_DIRECTORY/rocketctl
-        echo "rocketctl upgraded to latest version."
+        mv /tmp/rocketchatctl $ROCKETCHATCTL_DIRECTORY/
+        chmod 755 $ROCKETCHATCTL_DIRECTORY/rocketchatctl
+        echo "rocketchatctl upgraded to latest version."
         exit 0
     fi
 }
@@ -834,9 +839,9 @@ main() {
     local -r ROCKETCHAT_DIR_UPDATE="/opt/Rocket.Chat.bkup"
     local -r ROCKET_VERSION_INFO_URL="https://releases.rocket.chat/latest/info"
      
-    local -r ROCKETCTL_DOWNLOAD_URL="https://raw.githubusercontent.com/RocketChat/install.sh/master/rocketctl"
-    local -r ROCKETCTL_DIRECTORY="/usr/local/bin"
-    local -r ROCKETCTL_TEMP_DIRECTORY="/tmp"
+    local -r ROCKETCHATCTL_DOWNLOAD_URL="https://raw.githubusercontent.com/RocketChat/install.sh/master/rocketchatctl"
+    local -r ROCKETCHATCTL_DIRECTORY="/usr/local/bin"
+    local -r ROCKETCHATCTL_TEMP_DIRECTORY="/tmp"
     
     local -r TRAEFIK_DOWNLOAD_URL="https://github.com/containous/traefik/releases/download/v1.7.12/traefik"
     local -r CADDY_DOWNLOAD_URL="https://github.com/mholt/caddy/releases/download/v1.0.0/caddy_v1.0.0_linux_amd64.tar.gz"
@@ -859,6 +864,7 @@ main() {
     
     [ ${EUID} -ne 0 ] && print_run_as_root_error_and_exit
     [ $# -lt 1 ] && print_incorrect_parameters_error_and_exit
+    ! [[ -t 0 ]] && print_input_from_pipe_error_and_exit
     case $1 in
         --help|-h)
             show_help
@@ -879,8 +885,8 @@ main() {
                 do_update            
             fi
             ;;
-        upgrade-rocketctl)
-            do_upgrade_rocketctl
+        upgrade-rocketchatctl)
+            do_upgrade_rocketchatctl
             ;;
         *)
             show_help
