@@ -104,7 +104,7 @@ print_wrong_webserver_error_and_set_none(){
 }
 
 print_email_error_and_exit(){
-    errcho "rocket-mail must have an assigned value if decided to install webserver $webserver. Cancelling"
+    errcho "letsencrypt-email must have an assigned value if decided to install webserver $webserver. Cancelling"
     show_short_help
     exit 2
 }
