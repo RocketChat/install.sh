@@ -13,7 +13,7 @@ Usage: $(basename "$0") [options] [--root-url=ROOT_URL --port=PORT letsencrypt-e
 Installs node, mongo, RocketChat server and optionally a webserver (Caddy or Traefik), sets up directories and permissions to use Let's Encrypt certificates.
 In case node or mongo already installed, it uses already installed versions though confirmation is required.
 For node it set $NODE_VERSION as default in your system, for mongo mmapv1 storage engine and no authentication enabled is required during installation.
-If you wish this script to run unattended, provide extra flags to the install option, server URL is requiered (--root-url).
+If you wish this script to run unattended, provide extra flags to the install option, server URL is required (--root-url).
 
 OPTIONS
   -h help               Display this message
