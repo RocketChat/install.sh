@@ -16,10 +16,10 @@ For node it set $NODE_VERSION as default in your system, for mongo mmapv1 storag
 If you wish this script to run unattended, provide extra flags to the install option, server URL is required (--root-url).
 
 OPTIONS
-  -h help               Display this message
-  install               Install latest RocketChat server version
-  update                Update RocketChat server from current version to latest version
-  check-updates         Check for updates of RocketChat server
+  -h help                   Display this message
+  install                   Install latest RocketChat server version
+  update                    Update RocketChat server from current version to latest version
+  check-updates             Check for updates of RocketChat server
   upgrade-rocketchatctl     Upgrade the rocketchatctl command line tool                   
 
 FOR UNATTENDED INSTALLATION
@@ -455,7 +455,7 @@ defaultEntryPoints = ["https","http"]
 [acme]
 email = "$rocket_mail"
 storage = "etc/traefik/acme/acme.json"
-caServer = "https://acme-staging-v02.api.letsencrypt.org/directory"
+caServer = "https://acme-v02.api.letsencrypt.org/directory"
 entryPoint = "https"
   [acme.httpChallenge]
   entryPoint = "http"
@@ -574,7 +574,7 @@ Group=caddy
 Environment=CADDYPATH=/etc/caddy/ssl
 
 ; Always set "-root" to something safe in case it gets forgotten in the Caddyfile.
-ExecStart=/usr/local/bin/caddy -log stdout -agree=true -conf=/etc/caddy/Caddyfile -ca=https://acme-staging-v02.api.letsencrypt.org/directory -email=$rocket_mail
+ExecStart=/usr/local/bin/caddy -log stdout -agree=true -conf=/etc/caddy/Caddyfile -email=$rocket_mail
 ExecReload=/bin/kill -USR1 \$MAINPID
 
 ; Use graceful shutdown with a reasonable timeout
