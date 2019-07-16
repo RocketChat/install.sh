@@ -9,7 +9,7 @@ show_help(){
     cat <<EOM
 rocketchatctl command line tool to install and update RocketChat server
 
-Usage: $(basename "$0") [options] [--root-url=ROOT_URL --port=PORT letsencrypt-email=EMAIL --webserver=WEBSERVER  --version=VERSION --install-node --use-mongo]
+Usage: $(basename "$0") [options] [--root-url=ROOT_URL --port=PORT --letsencrypt-email=EMAIL --webserver=WEBSERVER  --version=VERSION --install-node --use-mongo]
 Installs node, mongo, RocketChat server and optionally a webserver (Caddy or Traefik), sets up directories and permissions to use Let's Encrypt certificates.
 In case node or mongo already installed, it uses already installed versions though confirmation is required.
 For node it set $NODE_VERSION as default in your system, for mongo mmapv1 storage engine and no authentication enabled is required during installation.
@@ -656,12 +656,12 @@ version_gt() {
 
 rocketchat_health_check(){
     local count=0
-    while ! ([ $rocket_healthy -eq  1 ] || [ $count -eq 15 ]); do
+    while ! ([ $rocket_healthy -eq  1 ] || [ $count -eq 30 ]); do
         get_rocketchat_current_version
         [[ $current_rocketchat_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] && rocket_healthy=1
         sleep 2
         ((count++))
-        echo "Waiting until 30 seconds for RocketChat server to be active ... $(($count * 2))"
+        echo "Waiting up to 60 seconds for RocketChat server to be active ... $(($count * 2))"
     done
 }
 
