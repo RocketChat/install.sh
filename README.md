@@ -1,4 +1,8 @@
 # install.sh
 
-Currently wip, not recommended to try and use yet at this point.  Stay tuned :)
+To use the released version of this you can run:
+
+```
+bash -c "$(curl https://rocket.chat/install.sh)"
+```
 
