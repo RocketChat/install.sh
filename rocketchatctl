@@ -20,7 +20,8 @@ OPTIONS
   install                   Install latest RocketChat server version
   update                    Update RocketChat server from current version to latest version
   check-updates             Check for updates of RocketChat server
-  upgrade-rocketchatctl     Upgrade the rocketchatctl command line tool                   
+  upgrade-rocketchatctl     Upgrade the rocketchatctl command line tool
+  configure                 Configures new values for ROOT_URL and Site_URL (--root-url flag REQUIRED)                 
 
 FOR UNATTENDED INSTALLATION
   --root-url=ROOT_URL       the public URL where RocketChat server will be accessible on the Internet (REQUIRED)
@@ -31,6 +32,7 @@ FOR UNATTENDED INSTALLATION
   --install-node            in case node installed, sets node to RocketChat server recommended version, default behavoir cancel RocketChat server installation
   --use-mongo               in case mongo installed, and storage engine configured is mmapv1, skip mongo installation but uses systems mongo for RocketChat server database, 
                             default database name rocketchat
+  --mongo-version           mongo 4 version, default value is latest (supported only for Debian and Ubuntu)
 
 EOM
 }
@@ -64,6 +66,11 @@ error_with_no_value_specified() {
 
 print_distro_not_supported_error_and_exit(){
     errcho "The detected Linux distribution is not supported by rocketchatctl."
+    exit 1
+}
+
+print_mongo_version_not_supported_and_exit(){
+    errcho "The detected Linux distribution does not support choosing mongo version."
     exit 1
 }
 
@@ -182,6 +189,14 @@ os_supported(){
     esac
 }
 
+mongo_version_supported(){
+    if  ! [ -z $MONGO_VERSION ]; then
+        if ! ([ $distro == ubuntu ] || [ $distro == debian ]); then
+            print_mongo_version_not_supported_and_exit
+        fi
+    fi
+}
+
 interactive_node(){
     if [ ${install_node_arg} -eq 0 ]; then
         read -r -p "Your current node version is $node_version. RocketChat server uses node $NODE_VERSION.
@@ -279,6 +294,13 @@ check_arguments_unattended_install() {
                 VERSION="${args[1]}"
                 ROCKETCHAT_DOWNLOAD_URL="https://releases.rocket.chat/$VERSION/download"
                 ;;
+            --mongo-version)
+                if [ ${#args[@]} -ne 2 ]; then
+                    error_with_no_value_specified "${args[0]}"
+                    exit 2
+                fi
+                MONGO_VERSION="${args[1]}"
+                ;;
             *)
                 show_help
                 exit 2
@@ -341,7 +363,20 @@ EOF
 
 apt_install_mongo(){
     apt-get update
-    apt-get install -y mongodb-org
+    if [ -z "${MONGO_VERSION}" ]; then
+        apt-get install -y mongodb-org
+    else
+        apt-get install -y mongodb-org=$MONGO_VERSION \
+        mongodb-org-server=$MONGO_VERSION \
+        mongodb-org-shell=$MONGO_VERSION \
+        mongodb-org-mongos=$MONGO_VERSION \
+        mongodb-org-tools=$MONGO_VERSION
+        echo "mongodb-org hold" | sudo dpkg --set-selections
+        echo "mongodb-org-server hold" | sudo dpkg --set-selections
+        echo "mongodb-org-shell hold" | sudo dpkg --set-selections
+        echo "mongodb-org-mongos hold" | sudo dpkg --set-selections
+        echo "mongodb-org-tools hold" | sudo dpkg --set-selections
+    fi
 }
 
 yum_install_mongo(){
@@ -392,6 +427,9 @@ set_rocketchat_user_and_permissions(){
 }
 
 create_rocketchat_systemd_file(){
+    if [ -f /lib/systemd/system/rocketchat.service ]; then
+        true > /lib/systemd/system/rocketchat.service
+    fi
     if [[ $webserver != "none" ]]; then
         BIND_IP="127.0.0.1"
     fi
@@ -419,6 +457,11 @@ start_rocketchat(){
     systemctl daemon-reload
     systemctl enable rocketchat
     systemctl start rocketchat
+}
+
+restart_rocketchat(){
+    systemctl daemon-reload
+    systemctl restart rocketchat
 }
 
 get_rocketchat_domain(){
@@ -695,6 +738,7 @@ do_setup(){
             print_mongo_connection_failed_error_and_exit    
         fi
     else
+        mongo_version_supported
         install_mongo=1
     fi
     # rocketchat
@@ -824,11 +868,34 @@ do_upgrade_rocketchatctl(){
     fi
 }
 
+do_configure(){
+    IFS='=' read -r -a args <<< $1
+    case "${args[0]}" in
+        --root-url)
+            if [ ${#args[@]} -ne 2 ]; then
+                error_with_no_value_specified "${args[0]}"
+                exit 2
+            fi
+            ROOT_URL="${args[1]}"
+            ;;
+        *)
+            show_help
+            exit 2
+            ;;
+    esac
+    siteurl_update_query="db.rocketchat_settings.update({\"_id\":\"Site_Url\"}, {\$set:{\"value\": \"${ROOT_URL}\"}});"
+    mongo_cmd_str=$(echo "mongo rocketchat --eval '${siteurl_update_query}'")
+    eval ${mongo_cmd_str}
+    create_rocketchat_systemd_file
+    restart_rocketchat
+}
+
 main() {
 
     local VERSION="latest"
     local -r NODE_VERSION="v8.11.4"
     local -r NPM_VERSION="6.4.1"
+    local MONGO_VERSION=""
     local -r MONGO_URL="mongodb://localhost:27017/rocketchat?replicaSet=rs01"
     local -r MONGO_OPLOG_URL="mongodb://localhost:27017/local?replicaSet=rs01"
      
@@ -887,6 +954,10 @@ main() {
             ;;
         upgrade-rocketchatctl)
             do_upgrade_rocketchatctl
+            ;;
+        configure)
+            shift
+            do_configure $@
             ;;
         *)
             show_help
