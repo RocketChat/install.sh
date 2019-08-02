@@ -156,6 +156,11 @@ print_rocketchat_in_latest_version_and_exit(){
     exit 2
 }
 
+print_no_webserver_installed_and_exit(){
+    echo "Looks like you don't have either Caddy or Traefik installed."
+    exit 2
+}
+
 print_done(){
     echo "Done :)"
 }
@@ -469,6 +474,13 @@ get_rocketchat_domain(){
 }
 
 traefik_config_file(){
+    if [ -f /etc/traefik/traefik.toml ]; then
+        sufix=$(date +%s)
+        cp /etc/traefik/traefik.toml /etc/traefik/traefik.toml.$sufix
+        if [ $? == 0 ]; then
+            true > /etc/traefik/traefik.toml
+        fi
+    fi
     cat << EOF | tee -a /etc/traefik/traefik.toml
 defaultEntryPoints = ["https","http"]
 
@@ -508,7 +520,6 @@ entryPoint = "https"
 EOF
 }
 
-## todo comment which ones to work? 
 traefik_systemd_file(){
     cat << EOF | tee -a /lib/systemd/system/traefik.service
 [Unit]
@@ -589,6 +600,13 @@ install_traefik(){
 }
 
 caddy_config_file(){
+    if [ -f /etc/caddy/Caddyfile ]; then
+        sufix=$(date +%s)
+        cp /etc/caddy/Caddyfile /etc/caddy/Caddyfile.$sufix
+        if [ $? == 0 ]; then
+            true > /etc/caddy/Caddyfile
+        fi
+    fi
     cat << EOF | tee -a /etc/caddy/Caddyfile
 $ROOT_URL
 proxy / localhost:$PORT {
@@ -599,6 +617,13 @@ EOF
 }
 
 caddy_systemd_file(){
+    if [ -f /lib/systemd/system/caddy.service ]; then
+        sufix=$(date +%s)
+        cp /lib/systemd/system/caddy.service /etc/caddy/caddy.service.$sufix
+        if [ $? == 0 ]; then
+            true > /lib/systemd/system/caddy.service
+        fi
+    fi
     cat << EOF | tee -a /lib/systemd/system/caddy.service
 [Unit]
 Description=Caddy HTTP/2 web server
@@ -868,26 +893,115 @@ do_upgrade_rocketchatctl(){
     fi
 }
 
-do_configure(){
-    IFS='=' read -r -a args <<< $1
-    case "${args[0]}" in
-        --root-url)
-            if [ ${#args[@]} -ne 2 ]; then
-                error_with_no_value_specified "${args[0]}"
-                exit 2
-            fi
-            ROOT_URL="${args[1]}"
+check_arguments_configure(){
+    case $1 in
+        --rocketchat)
+            configure_rocketchat=1
+            shift
+            while [ $# -gt 0 ]; do
+                IFS='=' read -r -a args <<< $1
+                case "${args[0]}" in
+                    --root-url)
+                        if [ ${#args[@]} -ne 2 ]; then
+                            error_with_no_value_specified "${args[0]}"
+                            exit 2
+                        fi
+                        ROOT_URL="${args[1]}"
+                        ;;
+                    --port)
+                        if [ ${#args[@]} -ne 2 ]; then
+                            error_with_no_value_specified "${args[0]}"
+                            exit 2
+                        fi
+                        PORT="${args[1]}"
+                        ;;
+                    *)
+                        show_help
+                        exit 2
+                        ;;
+                esac
+                shift
+            done
             ;;
+        --lets-encrypt)
+            configure_webserver=1
+            shift
+            while [ $# -gt 0 ]; do
+                IFS='=' read -r -a args <<< $1
+                case "${args[0]}" in
+                    --root-url)
+                        if [ ${#args[@]} -ne 2 ]; then
+                            error_with_no_value_specified "${args[0]}"
+                            exit 2
+                        fi
+                        ROOT_URL="${args[1]}"
+                        ;;
+                    --letsencrypt-email)
+                        if [ ${#args[@]} -ne 2 ]; then
+                            error_with_no_value_specified "${args[0]}"
+                            exit 2
+                        fi
+                        rocket_mail="${args[1]}"
+                        rocket_mail_arg=1
+                        ;;
+                    *)
+                        show_help
+                        exit 2
+                        ;;
+                esac
+                shift
+            done
+        ;;
         *)
             show_help
             exit 2
             ;;
     esac
+}
+
+do_configure_rocketchat(){
     siteurl_update_query="db.rocketchat_settings.update({\"_id\":\"Site_Url\"}, {\$set:{\"value\": \"${ROOT_URL}\"}});"
     mongo_cmd_str=$(echo "mongo rocketchat --eval '${siteurl_update_query}'")
     eval ${mongo_cmd_str}
     create_rocketchat_systemd_file
     restart_rocketchat
+}
+
+get_webserver_installed(){
+    if ([ -f /etc/caddy/Caddyfile ] && [ ! -f /etc/traefik/traefik.toml ]); then
+        webserver=caddy
+    elif ([ ! -f /etc/caddy/Caddyfile ] && [ -f /etc/traefik/traefik.toml ]); then
+        webserver=traefik
+    else
+        print_no_webserver_installed_and_exit
+    fi
+}
+
+do_configure(){
+    if [ "${configure_rocketchat}" -eq 1 ]; then
+        get_webserver_installed
+        do_configure_rocketchat
+    elif [ "${configure_webserver}" -eq 1 ]; then
+        get_webserver_installed
+        PORT=$(cat /lib/systemd/system/rocketchat.service |grep PORT |awk -F= '{print $3}')
+        do_configure_rocketchat
+        case "$webserver" in
+            traefik)
+                get_rocketchat_domain
+                traefik_config_file
+                systemctl restart traefik.service
+                ;;
+            caddy)
+                caddy_config_file
+                caddy_systemd_file
+                systemctl daemon-reload
+                systemctl restart caddy.service
+                ;;
+            *)
+                print_no_webserver_installed_and_exit
+                ;;
+        esac
+    fi
 }
 
 main() {
@@ -928,6 +1042,9 @@ main() {
     local webserver_arg=0
     local rocket_mail_arg=""
     local rocket_domain=""
+    local configure_rocketchat=""
+    local configure_webserver=""
+    local sufix=$(date +%s)
     
     [ ${EUID} -ne 0 ] && print_run_as_root_error_and_exit
     [ $# -lt 1 ] && print_incorrect_parameters_error_and_exit
@@ -957,7 +1074,8 @@ main() {
             ;;
         configure)
             shift
-            do_configure $@
+            check_arguments_configure $@
+            do_configure
             ;;
         *)
             show_help
