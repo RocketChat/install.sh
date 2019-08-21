@@ -791,6 +791,7 @@ do_update(){
     if [ $? == 0 ]; then
         systemctl stop rocketchat
         install_rocketchat
+        set_rocketchat_user_and_permissions
         systemctl start rocketchat
         rocketchat_health_check
         if [ $rocket_healthy -eq 1 ]; then
