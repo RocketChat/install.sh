@@ -321,7 +321,7 @@ check_arguments_unattended_install() {
 apt_install_node(){
     curl -sL $NODE_DEB_DOWNLOAD_URL | bash -
     apt-get install -y build-essential graphicsmagick
-    apt-get install -y nodejs=8.16.0-1nodesource1
+    apt-get install -y nodejs=8.16.1-1nodesource1
 }
 
 yum_install_node(){
@@ -334,7 +334,7 @@ yum_install_node(){
 npm_install_node(){
     if [ "$distro_version" == "19.04" ]; then
         curl -sL $NODE_DEB_DOWNLOAD_URL | bash -
-        apt-get install -y --allow-downgrades nodejs=8.16.0-1nodesource1
+        apt-get install -y --allow-downgrades nodejs=8.16.1-1nodesource1
     fi
     npm install -g npm@$NPM_VERSION
     npm install -g inherits node-gyp@4.0.0 n && n $NODE_VERSION
