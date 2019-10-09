@@ -1019,8 +1019,8 @@ do_configure(){
 main() {
 
     local VERSION="latest"
-    local -r NODE_VERSION="v8.11.4"
-    local -r NPM_VERSION="6.4.1"
+    local -r NODE_VERSION="v8.15.1"
+    local -r NPM_VERSION="6.9.0"
     local MONGO_VERSION=""
     local -r MONGO_URL="mongodb://localhost:27017/rocketchat?replicaSet=rs01"
     local -r MONGO_OPLOG_URL="mongodb://localhost:27017/local?replicaSet=rs01"
