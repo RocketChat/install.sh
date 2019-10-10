@@ -965,12 +965,28 @@ check_arguments_configure(){
     esac
 }
 
+update_rocketchat_systemd_file(){
+    ROOT_URL_REPLACED=$(echo ${ROOT_URL//\//\\/})
+    sed -i "/^Environment=ROOT_URL=/c\Environment=ROOT_URL=$ROOT_URL_REPLACED" /lib/systemd/system/rocketchat.service
+    sed -i "/^Environment=PORT=/c\Environment=PORT=$PORT"  /lib/systemd/system/rocketchat.service
+    if [[ $webserver != "none" ]]; then
+        if grep -q do-marketplace "/lib/systemd/system/rocketchat.service"; then
+            do_update_bind_ip
+        fi
+    fi
+}
+
+do_update_bind_ip(){
+    BIND_IP="127.0.0.1"
+    sed -i "/^Environment=BIND_IP=/c\Environment=BIND_IP=$BIND_IP" /lib/systemd/system/rocketchat.service
+}
+
 do_configure_rocketchat(){
     if [ "${root_url_arg}" -eq 1 ]; then
         siteurl_update_query="db.rocketchat_settings.update({\"_id\":\"Site_Url\"}, {\$set:{\"value\": \"${ROOT_URL}\"}});"
         mongo_cmd_str=$(echo "mongo rocketchat --eval '${siteurl_update_query}'")
         eval ${mongo_cmd_str}
-        create_rocketchat_systemd_file
+        update_rocketchat_systemd_file
         restart_rocketchat
     else
         print_root_url_error_and_exit
