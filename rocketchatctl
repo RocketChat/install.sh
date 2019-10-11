@@ -32,11 +32,12 @@ FOR UNATTENDED INSTALLATION
   --install-node            in case node installed, sets node to RocketChat server recommended version, default behavoir cancel RocketChat server installation
   --use-mongo               in case mongo installed, and storage engine configured is mmapv1, skip mongo installation but uses systems mongo for RocketChat server database, 
                             default database name rocketchat
-  --mongo-version           mongo 4 version, default value is latest (supported only for Debian and Ubuntu)
+  --mongo-version=4.x.x     mongo 4 version, default value is latest (supported only for Debian and Ubuntu)
+  --bind-loopback=value     value=(true|false) set to false to prevent from bind RocketChat server to loopback interface when installing a webserver (default true)
 
 FOR CONFIGURE OPTION
-  --rocketchat --root-url=ROOT_URL --port=PORT                  Reconfigures RocketChat server Site-URL and port (--root-url REQUIRED)
-  --lets-encrypt --root-url=ROOT_URL --letsencrypt-email=EMAIL  Reconfigures webserver with Let's Encrypt and RocketChat server Site-URL
+  --rocketchat --root-url=ROOT_URL --port=PORT --bind-loopback=value                  Reconfigures RocketChat server Site-URL and port (--root-url REQUIRED)
+  --lets-encrypt --root-url=ROOT_URL --letsencrypt-email=EMAIL --bind-loopback=value  Reconfigures webserver with Let's Encrypt and RocketChat server Site-URL (--root-url and letsencrypt-email REQUIRED)
 EOM
 }
 
@@ -309,6 +310,13 @@ check_arguments_unattended_install() {
                 fi
                 MONGO_VERSION="${args[1]}"
                 ;;
+            --bind-loopback)
+                if [ ${#args[@]} -ne 2 ]; then
+                    error_with_no_value_specified "${args[0]}"
+                    exit 2
+                fi
+                bind_loopback="${args[1]}"
+                ;;
             *)
                 show_help
                 exit 2
@@ -321,7 +329,7 @@ check_arguments_unattended_install() {
 apt_install_node(){
     curl -sL $NODE_DEB_DOWNLOAD_URL | bash -
     apt-get install -y build-essential graphicsmagick
-    apt-get install -y nodejs=8.16.1-1nodesource1
+    apt-get install -y nodejs=8.16.2-1nodesource1
 }
 
 yum_install_node(){
@@ -334,7 +342,7 @@ yum_install_node(){
 npm_install_node(){
     if [ "$distro_version" == "19.04" ]; then
         curl -sL $NODE_DEB_DOWNLOAD_URL | bash -
-        apt-get install -y --allow-downgrades nodejs=8.16.1-1nodesource1
+        apt-get install -y --allow-downgrades nodejs=8.16.2-1nodesource1
     fi
     npm install -g npm@$NPM_VERSION
     npm install -g inherits node-gyp@4.0.0 n && n $NODE_VERSION
@@ -438,7 +446,7 @@ create_rocketchat_systemd_file(){
     if [ -f /lib/systemd/system/rocketchat.service ]; then
         true > /lib/systemd/system/rocketchat.service
     fi
-    if [[ $webserver != "none" ]]; then
+    if [[ $webserver != "none" ]] && $bind_loopback; then
         BIND_IP="127.0.0.1"
     fi
     cat << EOF | tee -a /lib/systemd/system/rocketchat.service
@@ -920,6 +928,14 @@ check_arguments_configure(){
                         fi
                         PORT="${args[1]}"
                         ;;
+                    --bind-loopback)
+                        if [ ${#args[@]} -ne 2 ]; then
+                            error_with_no_value_specified "${args[0]}"
+                            exit 2
+                        fi
+                        bind_loopback="${args[1]}"
+                        bind_loopback_arg=1
+                        ;;
                     *)
                         show_help
                         exit 2
@@ -950,6 +966,14 @@ check_arguments_configure(){
                         rocket_mail="${args[1]}"
                         rocket_mail_arg=1
                         ;;
+                    --bind-loopback)
+                        if [ ${#args[@]} -ne 2 ]; then
+                            error_with_no_value_specified "${args[0]}"
+                            exit 2
+                        fi
+                        bind_loopback="${args[1]}"
+                        bind_loopback_arg=1
+                        ;;
                     *)
                         show_help
                         exit 2
@@ -965,12 +989,22 @@ check_arguments_configure(){
     esac
 }
 
+update_rocketchat_systemd_file(){
+    ROOT_URL_REPLACED=$(echo ${ROOT_URL//\//\\/})
+    sed -i "/^Environment=ROOT_URL=/c\Environment=ROOT_URL=$ROOT_URL_REPLACED" /lib/systemd/system/rocketchat.service
+    sed -i "/^Environment=PORT=/c\Environment=PORT=$PORT"  /lib/systemd/system/rocketchat.service
+    if [ "${bind_loopback_arg}" -eq 1 ] || [ "${configure_webserver}" -eq 1 ] ; then
+        [[ $bind_loopback == true ]] && BIND_IP=127.0.0.1 || BIND_IP=0.0.0.0
+        sed -i "/^Environment=BIND_IP=/c\Environment=BIND_IP=$BIND_IP"  /lib/systemd/system/rocketchat.service
+    fi
+}
+
 do_configure_rocketchat(){
     if [ "${root_url_arg}" -eq 1 ]; then
         siteurl_update_query="db.rocketchat_settings.update({\"_id\":\"Site_Url\"}, {\$set:{\"value\": \"${ROOT_URL}\"}});"
         mongo_cmd_str=$(echo "mongo rocketchat --eval '${siteurl_update_query}'")
         eval ${mongo_cmd_str}
-        create_rocketchat_systemd_file
+        update_rocketchat_systemd_file
         restart_rocketchat
     else
         print_root_url_error_and_exit
@@ -1048,11 +1082,13 @@ main() {
     local ROOT_URL=""
     local PORT=3000
     local BIND_IP="0.0.0.0"
+    local bind_loopback=true
     local webserver=none
     local install_node_arg=0
     local use_mongo_arg=0
     local webserver_arg=0
     local rocket_mail_arg=0
+    local bind_loopback_arg=0
     local rocket_domain=""
     local configure_rocketchat=0
     local configure_webserver=0
