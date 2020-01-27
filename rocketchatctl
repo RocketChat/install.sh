@@ -184,13 +184,13 @@ os_supported(){
     get_os_distro
     case "$distro" in
         ubuntu)
-            [[ "$distro_version" =~ (("18.04"|"19.04")) ]] || print_distro_not_supported_error_and_exit
+            [[ "$distro_version" =~ (("18.04"|"19.04"|"19.10")) ]] || print_distro_not_supported_error_and_exit
             ;;
         debian)
             [[ "$distro_version" == "9" ]] || print_distro_not_supported_error_and_exit
             ;;
         centos)
-            [[ "$distro_version" == "7" ]] || print_distro_not_supported_error_and_exit
+            [[ "$distro_version" =~ (("7"|"8")) ]] || print_distro_not_supported_error_and_exit
             ;;
         *)
             print_distro_not_supported_error_and_exit
@@ -329,7 +329,7 @@ check_arguments_unattended_install() {
 apt_install_node(){
     curl -sL $NODE_DEB_DOWNLOAD_URL | bash -
     apt-get install -y build-essential graphicsmagick
-    apt-get install -y nodejs=8.16.2-1nodesource1
+    apt-get install -y nodejs=8.17.0-1nodesource1
 }
 
 yum_install_node(){
@@ -340,9 +340,9 @@ yum_install_node(){
 }
 
 npm_install_node(){
-    if [ "$distro_version" == "19.04" ]; then
+    if [[ "$distro_version" =~ (("19.04"|"19.10")) ]]; then
         curl -sL $NODE_DEB_DOWNLOAD_URL | bash -
-        apt-get install -y --allow-downgrades nodejs=8.16.2-1nodesource1
+        apt-get install -y --allow-downgrades nodejs=8.17.0-1nodesource1
     fi
     npm install -g npm@$NPM_VERSION
     npm install -g inherits node-gyp@4.0.0 n && n $NODE_VERSION
@@ -449,12 +449,15 @@ create_rocketchat_systemd_file(){
     if [[ $webserver != "none" ]] && $bind_loopback; then
         BIND_IP="127.0.0.1"
     fi
+    if [[ $distro == "centos" ]]; then
+        node_path="/usr/local/bin/node"
+    fi
     cat << EOF | tee -a /lib/systemd/system/rocketchat.service
 [Unit]
 Description=The Rocket.Chat server
 After=network.target remote-fs.target nss-lookup.target mongod.service
 [Service]
-ExecStart=/usr/local/bin/node /opt/Rocket.Chat/main.js
+ExecStart=$node_path /opt/Rocket.Chat/main.js
 StandardOutput=syslog
 StandardError=syslog
 SyslogIdentifier=rocketchat
@@ -1053,7 +1056,7 @@ do_configure(){
 main() {
 
     local VERSION="latest"
-    local -r NODE_VERSION="v8.15.1"
+    local -r NODE_VERSION="v8.17.0"
     local -r NPM_VERSION="6.9.0"
     local MONGO_VERSION=""
     local -r MONGO_URL="mongodb://localhost:27017/rocketchat?replicaSet=rs01"
@@ -1070,7 +1073,7 @@ main() {
     local -r ROCKETCHATCTL_DIRECTORY="/usr/local/bin"
     local -r ROCKETCHATCTL_TEMP_DIRECTORY="/tmp"
     
-    local -r TRAEFIK_DOWNLOAD_URL="https://github.com/containous/traefik/releases/download/v1.7.12/traefik"
+    local -r TRAEFIK_DOWNLOAD_URL="https://github.com/containous/traefik/releases/download/v1.7.20/traefik"
     local -r CADDY_DOWNLOAD_URL="https://github.com/mholt/caddy/releases/download/v1.0.0/caddy_v1.0.0_linux_amd64.tar.gz"
     
     local distro=""
@@ -1094,6 +1097,7 @@ main() {
     local configure_webserver=0
     local root_url_arg=0
     local sufix=$(date +%s)
+    local node_path="/usr/bin/node"
     
     [ ${EUID} -ne 0 ] && print_run_as_root_error_and_exit
     [ $# -lt 1 ] && print_incorrect_parameters_error_and_exit
