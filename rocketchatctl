@@ -191,6 +191,11 @@ print_backup_dir_error_and_exit(){
     exit 1
 }
 
+print_node_not_updated_error_and_exit(){
+    echo "Error: node version was not updated correctly. Cancelling ..."
+    exit 1
+}
+
 print_done(){
     echo "Done :)"
 }
@@ -888,7 +893,6 @@ do_check_updates(){
         print_check_update_change_node_version
         print_update_available_and_exit
     elif version_gt $latest_rocketchat_version $current_rocketchat_version; then
-        ## todo: don't update from current to latest in certain cases, which ones?
         print_update_available_and_exit
     elif [ $latest_rocketchat_version == $current_rocketchat_version ]; then
         print_rocketchat_in_latest_version_and_exit
@@ -898,7 +902,6 @@ do_check_updates(){
 }                
 
 do_update(){
-    echo $update_node
     if [ $update_node -eq 1 ]; then
         do_update_node
     fi
@@ -924,7 +927,7 @@ do_update(){
 }
 
 check_node_major_version(){
-    major_version=${latest_rocketchat_version:0:2}
+    major_version=${NODE_VERSION:1:2}
     [[ $(node -v) =~ ^v$major_version\.[0-9]+\.[0-9]+$ ]]
 }
 
@@ -1106,25 +1109,27 @@ do_configure(){
 }
 
 check_arguments_backup(){
-    IFS='=' read -r -a args <<< $1
-    case "${args[0]}" in
-        --dir)
-            if [ ${#args[@]} -ne 2 ]; then
-                error_with_no_value_specified "${args[0]}"
+    while [ $# -gt 0 ]; do
+        IFS='=' read -r -a args <<< $1
+        case "${args[0]}" in
+            --dir)
+                if [ ${#args[@]} -ne 2 ]; then
+                    error_with_no_value_specified "${args[0]}"
+                    exit 2
+                fi
+                backup_dir="${args[1]}"
+                ;;
+            *)
+                show_help
                 exit 2
-            fi
-            backup_dir="${args[1]}"
-            ;;
-        *)
-            show_help
-            exit 2
-            ;;
-    esac
+                ;;
+        esac
+        shift
+    done
 }
 
 check_bkup_dir(){
-    echo $backup_dir
-    touch $backup_dir/testfile_$sufix.txt
+    touch $backup_dir/testfile_$sufix.txt /dev/null 2>&1
     [[ $? -ne 0 ]] && print_backup_dir_error_and_exit || rm $backup_dir/testfile_$sufix.txt
 }
 
