@@ -175,7 +175,7 @@ print_make_backup(){
 }
 
 print_check_update_change_node_version(){
-    echo "IMPORTANT: Update from version 2.x to 3.x requieres node update, if you decide to uptade, your node version will change from 8.x to 12.x."
+    echo "IMPORTANT: Update from version 2.x to 3.x requires node update, if you decide to update, your node version will change from 8.x to 12.x."
 }    
 
 print_update_available_and_exit(){
