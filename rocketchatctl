@@ -21,7 +21,8 @@ OPTIONS
   update                    Update RocketChat server from current version to latest version
   check-updates             Check for updates of RocketChat server
   upgrade-rocketchatctl     Upgrade the rocketchatctl command line tool
-  configure                 Configures RocketChat server and Let's Encrypt                 
+  configure                 Configures RocketChat server and Let's Encrypt
+  backup                    Makes a rocketchat database backup
 
 FOR UNATTENDED INSTALLATION
   --root-url=ROOT_URL       the public URL where RocketChat server will be accessible on the Internet (REQUIRED)
@@ -38,6 +39,10 @@ FOR UNATTENDED INSTALLATION
 FOR CONFIGURE OPTION
   --rocketchat --root-url=ROOT_URL --port=PORT --bind-loopback=value                  Reconfigures RocketChat server Site-URL and port (--root-url REQUIRED)
   --lets-encrypt --root-url=ROOT_URL --letsencrypt-email=EMAIL --bind-loopback=value  Reconfigures webserver with Let's Encrypt and RocketChat server Site-URL (--root-url and letsencrypt-email REQUIRED)
+
+FOR BACKUP OPTION
+  --dir=<path_to_dir>       sets the directory for storing the backup files, default backup directory is /tmp
+
 EOM
 }
 
@@ -163,6 +168,32 @@ print_rocketchat_in_latest_version_and_exit(){
 print_no_webserver_installed_and_exit(){
     echo "Looks like you don't have either Caddy or Traefik installed."
     exit 2
+}
+
+print_make_backup(){
+    echo "Updates could be risky, you can use the backup option # rocketchatctl backup, to create a backup of the rocketchat database first. Please check that you have enough space in your system to store the backup."
+}
+
+print_check_update_change_node_version(){
+    echo "IMPORTANT: Update from version 2.x to 3.x requires node update, if you decide to update, your node version will change from 8.x to 12.x."
+}    
+
+print_update_available_and_exit(){
+    echo "Current update available for RocketChat server: from $current_rocketchat_version to $latest_rocketchat_version."
+}
+
+print_backup_ok(){
+    echo "Backup done successfully, check for the backup file in $backup_dir/dump_$sufix.gz. You can restore using # mongorestore --host localhost:27017 --db rocketchat --archive --gzip < $backup_dir/dump_$sufix.gz"
+}
+
+print_backup_dir_error_and_exit(){
+    echo "Can't write in the backup directory: $backup_dir"
+    exit 1
+}
+
+print_node_not_updated_error_and_exit(){
+    echo "Error: node version was not updated correctly. Cancelling ..."
+    exit 1
 }
 
 print_done(){
@@ -329,7 +360,7 @@ check_arguments_unattended_install() {
 apt_install_node(){
     curl -sL $NODE_DEB_DOWNLOAD_URL | bash -
     apt-get install -y build-essential graphicsmagick
-    apt-get install -y nodejs=8.17.0-1nodesource1
+    apt-get install -y nodejs
 }
 
 yum_install_node(){
@@ -340,10 +371,6 @@ yum_install_node(){
 }
 
 npm_install_node(){
-    if [[ "$distro_version" =~ (("19.04"|"19.10")) ]]; then
-        curl -sL $NODE_DEB_DOWNLOAD_URL | bash -
-        apt-get install -y --allow-downgrades nodejs=8.17.0-1nodesource1
-    fi
     npm install -g npm@$NPM_VERSION
     npm install -g inherits node-gyp@4.0.0 n && n $NODE_VERSION
 }
@@ -467,6 +494,7 @@ Environment=MONGO_OPLOG_URL=$MONGO_OPLOG_URL
 Environment=ROOT_URL=$ROOT_URL
 Environment=PORT=$PORT
 Environment=BIND_IP=$BIND_IP
+Environment=DEPLOY_PLATFORM=rocketchatctl
 [Install]
 WantedBy=multi-user.target
 EOF
@@ -859,9 +887,13 @@ do_install(){
 do_check_updates(){
     get_rocketchat_latest_version
     get_rocketchat_current_version
-    if version_gt $latest_rocketchat_version $current_rocketchat_version; then
-        ## todo: don't update from current to latest in certain cases, which ones?
-        echo "Current update available for RocketChat server: from $current_rocketchat_version to $latest_rocketchat_version"
+    print_make_backup
+    if ([[ $current_rocketchat_version =~ ^([0-2]\..\..)$ ]] && [[ ${latest_rocketchat_version:0:2} -eq 3 ]]); then
+        update_node=1
+        print_check_update_change_node_version
+        print_update_available_and_exit
+    elif version_gt $latest_rocketchat_version $current_rocketchat_version; then
+        print_update_available_and_exit
     elif [ $latest_rocketchat_version == $current_rocketchat_version ]; then
         print_rocketchat_in_latest_version_and_exit
     else
@@ -870,6 +902,9 @@ do_check_updates(){
 }                
 
 do_update(){
+    if [ $update_node -eq 1 ]; then
+        do_update_node
+    fi
     mv $ROCKETCHAT_DIR $ROCKETCHAT_DIR_UPDATE
     if [ $? == 0 ]; then
         systemctl stop rocketchat
@@ -889,6 +924,26 @@ do_update(){
     else
         print_update_backup_failed_exit
     fi
+}
+
+check_node_major_version(){
+    major_version=${NODE_VERSION:1:2}
+    [[ $(node -v) =~ ^v$major_version\.[0-9]+\.[0-9]+$ ]]
+}
+
+do_update_node(){
+    case "$distro" in
+        ubuntu|debian)
+            apt_install_node
+            ;;
+        centos)
+            yum_install_node
+            ;;
+        *)
+            ;;
+    esac
+    npm_install_node
+    check_node_major_version || print_node_not_updated_error_and_exit 
 }
 
 do_upgrade_rocketchatctl(){
@@ -1053,18 +1108,56 @@ do_configure(){
     fi
 }
 
+check_arguments_backup(){
+    while [ $# -gt 0 ]; do
+        IFS='=' read -r -a args <<< $1
+        case "${args[0]}" in
+            --dir)
+                if [ ${#args[@]} -ne 2 ]; then
+                    error_with_no_value_specified "${args[0]}"
+                    exit 2
+                fi
+                backup_dir="${args[1]}"
+                ;;
+            *)
+                show_help
+                exit 2
+                ;;
+        esac
+        shift
+    done
+}
+
+check_bkup_dir(){
+    touch $backup_dir/testfile_$sufix.txt /dev/null 2>&1
+    [[ $? -ne 0 ]] && print_backup_dir_error_and_exit || rm $backup_dir/testfile_$sufix.txt
+}
+
+do_backup(){
+    check_bkup_dir
+    systemctl stop rocketchat
+    mongodump --host localhost:27017 --db rocketchat --archive --gzip \
+    | cat > $backup_dir/dump_$sufix.gz
+    if [ $? == 0 ]; then
+        systemctl start rocketchat
+        [ -s $backup_dir/dump_$sufix.gz ] && print_backup_ok || print_backup_error_and_exit
+    else
+        print_empty_backup_error_and_exit
+    fi
+}
+
 main() {
 
     local VERSION="latest"
-    local -r NODE_VERSION="v8.17.0"
-    local -r NPM_VERSION="6.9.0"
+    local -r NODE_VERSION="v12.14.0"
+    local -r NPM_VERSION="6.13.4"
     local MONGO_VERSION=""
     local -r MONGO_URL="mongodb://localhost:27017/rocketchat?replicaSet=rs01"
     local -r MONGO_OPLOG_URL="mongodb://localhost:27017/local?replicaSet=rs01"
      
     local ROCKETCHAT_DOWNLOAD_URL="https://releases.rocket.chat/$VERSION/download"
-    local -r NODE_DEB_DOWNLOAD_URL="https://deb.nodesource.com/setup_8.x"
-    local -r NODE_RPM_DOWNLOAD_URL="https://rpm.nodesource.com/setup_8.x"
+    local -r NODE_DEB_DOWNLOAD_URL="https://deb.nodesource.com/setup_12.x"
+    local -r NODE_RPM_DOWNLOAD_URL="https://rpm.nodesource.com/setup_12.x"
     local -r ROCKETCHAT_DIR="/opt/Rocket.Chat"
     local -r ROCKETCHAT_DIR_UPDATE="/opt/Rocket.Chat.bkup"
     local -r ROCKET_VERSION_INFO_URL="https://releases.rocket.chat/latest/info"
@@ -1098,6 +1191,8 @@ main() {
     local root_url_arg=0
     local sufix=$(date +%s)
     local node_path="/usr/bin/node"
+    local backup_dir="/tmp"
+    local update_node=0
     
     [ ${EUID} -ne 0 ] && print_run_as_root_error_and_exit
     [ $# -lt 1 ] && print_incorrect_parameters_error_and_exit
@@ -1129,6 +1224,11 @@ main() {
             shift
             check_arguments_configure $@
             do_configure
+            ;;
+        backup)
+            shift
+            check_arguments_backup $@
+            do_backup
             ;;
         *)
             show_help
