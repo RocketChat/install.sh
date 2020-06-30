@@ -215,7 +215,7 @@ os_supported(){
     get_os_distro
     case "$distro" in
         ubuntu)
-            [[ "$distro_version" =~ (("18.04"|"19.04"|"19.10")) ]] || print_distro_not_supported_error_and_exit
+            [[ "$distro_version" =~ (("18.04"|"19.04"|"19.10"|"20.04")) ]] || print_distro_not_supported_error_and_exit
             ;;
         debian)
             [[ "$distro_version" == "9" ]] || print_distro_not_supported_error_and_exit
