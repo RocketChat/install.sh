@@ -751,7 +751,7 @@ get_rocketchat_latest_version(){
     if ! command_exists curl; then
         apt-get install -y curl
     fi
-    latest_rocketchat_version=$(curl $ROCKET_VERSION_INFO_URL 2>/dev/null |grep -w tag |awk -F: '{print $2}'|tr -d , |tr -d \")
+    latest_rocketchat_version=$(curl $ROCKET_VERSION_INFO_URL 2>/dev/null |grep -w tag |awk -F: '{print $2}'|awk -F'"' '{print $2}')
 }
 
 get_rocketchat_current_version(){
