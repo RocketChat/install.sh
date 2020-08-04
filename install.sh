@@ -1,13 +1,8 @@
 #!/bin/bash
 
 readonly ROCKETCHATCTL_DOWNLOAD_URL="https://raw.githubusercontent.com/RocketChat/install.sh/master/rocketchatctl"
-read -p "Do you want to use the default path for installation Y/n: " var
-if [[ "$var" =~ ^([yY][eE][sS]|[yY])$ ]]; then
-    readonly ROCKETCHATCTL_DIRECTORY="/usr/local/bin"
-else
-    read -p "Enter the directory path for installation: " var
-    readonly ROCKETCHATCTL_DIRECTORY=$var
-fi
+
+ROCKETCHATCTL_DIRECTORY="/usr/local/bin"
 
 if [ ${EUID} -ne 0 ]; then
     echo "This script must be run as root. Cancelling" >&2
@@ -17,6 +12,13 @@ if ! [[ -t 0 ]]; then
     echo "This script is interactive, please run: bash -c \"\$(curl https://rocketchat.github.io/beta-install.sh)\"" >&2
     exit 1
 fi
+
+read -p "Do you want to use the default path for installation Y/n: " var
+if [[ "$var" =~ ^([nN][oO]|[nN])$ ]]; then
+    read -p "Enter the directory path for installation: " var
+    ROCKETCHATCTL_DIRECTORY=$var
+fi
+
 if [ ! -f "$ROCKETCHATCTL_DIRECTORY/rocketchatctl" ]; then
     curl -L $ROCKETCHATCTL_DOWNLOAD_URL -o /tmp/rocketchatctl
     if  [ $? != 0 ]; then
