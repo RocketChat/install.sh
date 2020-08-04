@@ -41,7 +41,7 @@ FOR CONFIGURE OPTION
   --lets-encrypt --root-url=ROOT_URL --letsencrypt-email=EMAIL --bind-loopback=value  Reconfigures webserver with Let's Encrypt and RocketChat server Site-URL (--root-url and letsencrypt-email REQUIRED)
 
 FOR BACKUP OPTION
-  --dir=<path_to_dir>       sets the directory for storing the backup files, default backup directory is /tmp
+  --backup-dir=<path_to_dir>       sets the directory for storing the backup files, default backup directory is /tmp
 
 EOM
 }
@@ -1115,7 +1115,7 @@ check_arguments_backup(){
     while [ $# -gt 0 ]; do
         IFS='=' read -r -a args <<< $1
         case "${args[0]}" in
-            --dir)
+            --backup-dir)
                 if [ ${#args[@]} -ne 2 ]; then
                     error_with_no_value_specified "${args[0]}"
                     exit 2
