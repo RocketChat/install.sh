@@ -1,6 +1,6 @@
 #!/bin/bash
 
-readonly ROCKETCHATCTL_DOWNLOAD_URL="https://raw.githubusercontent.com/RocketChat/install.sh/master/rocketchatctl"
+readonly ROCKETCHATCTL_DOWNLOAD_URL="https://install.rocket.chat/rocketchatctl"
 readonly ROCKETCHATCTL_DIRECTORY="/usr/local/bin"
 
 if [ ${EUID} -ne 0 ]; then
@@ -8,7 +8,7 @@ if [ ${EUID} -ne 0 ]; then
     exit 1
 fi
 if ! [[ -t 0 ]]; then
-    echo "This script is interactive, please run: bash -c \"\$(curl https://rocketchat.github.io/beta-install.sh)\"" >&2
+    echo "This script is interactive, please run: bash -c \"\$(curl https://install.rocket.chat)\"" >&2
     exit 1
 fi
 if [ ! -f "$ROCKETCHATCTL_DIRECTORY/rocketchatctl" ]; then
