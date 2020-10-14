@@ -23,6 +23,8 @@ OPTIONS
   upgrade-rocketchatctl     Upgrade the rocketchatctl command line tool
   configure                 Configures RocketChat server and Let's Encrypt
   backup                    Makes a rocketchat database backup
+  info                      Display Instance statistics in Json readable format
+                            To exectute this, you have to create Personal Access Token for the admin user first [https://docs.rocket.chat/api/rest-api/personal-access-tokens]
 
 FOR UNATTENDED INSTALLATION
   --root-url=ROOT_URL       the public URL where RocketChat server will be accessible on the Internet (REQUIRED)
@@ -1232,6 +1234,18 @@ main() {
             shift
             check_arguments_backup $@
             do_backup
+            ;;
+        info)
+            echo "Any doubts with Access Token and UserID, run 'rocketchatctl help' command first"
+            read -p "Enter the Access Token admin user:" token
+            read -p "Enter admin UserID:" userid
+            if systemctl status rocketchat > /dev/null 2>&1; then
+                PORT=$(cat /lib/systemd/system/rocketchat.service |grep PORT |awk -F= '{print $3}')
+
+                curl -s -H "X-Auth-Token: ${token}" -H "X-User-Id: ${userid}" http://localhost:$PORT/api/v1/statistics | python -m json.tool
+            else
+                print_rocketchat_not_running_error_and_exit
+            fi
             ;;
         *)
             show_help
