@@ -12,7 +12,7 @@ rocketchatctl command line tool to install and update RocketChat server
 Usage: $(basename "$0") [options] [--root-url=ROOT_URL --port=PORT --letsencrypt-email=EMAIL --webserver=WEBSERVER  --version=VERSION --install-node --use-mongo]
 Installs node, mongo, RocketChat server and optionally a webserver (Caddy or Traefik), sets up directories and permissions to use Let's Encrypt certificates.
 In case node or mongo already installed, it uses already installed versions though confirmation is required.
-For node it set $NODE_VERSION as default in your system, for mongo mmapv1 storage engine and no authentication enabled is required during installation.
+For node it set $NODE_VERSION as default in your system, for mongo wiredTiger is the default storage engine and no authentication enabled is required during installation.
 If you wish this script to run unattended, provide extra flags to the install option, server URL is required (--root-url).
 
 OPTIONS
@@ -31,8 +31,7 @@ FOR UNATTENDED INSTALLATION
   --letsencrypt-email=EMAIL e-mail address to use for SSL certificates (REQUIRED if webserver is not none)
   --version=VERSION         RocketChat server version to install, default latest
   --install-node            in case node installed, sets node to RocketChat server recommended version, default behavoir cancel RocketChat server installation
-  --use-mongo               in case mongo installed, and storage engine configured is mmapv1, skip mongo installation but uses systems mongo for RocketChat server database, 
-                            default database name rocketchat
+  --use-mongo               in case mongo installed, skip mongo installation but uses systems mongo for RocketChat server database, default database name rocketchat
   --mongo-version=4.x.x     mongo 4 version, default value is latest (supported only for Debian and Ubuntu)
   --bind-loopback=value     value=(true|false) set to false to prevent from bind RocketChat server to loopback interface when installing a webserver (default true)
 
@@ -93,10 +92,11 @@ print_use_mongo_for_rocketchat_error_and_exit(){
     exit 1
 }
 
-print_mongo_storage_engine_error_and_exit(){
-    errcho "Storage engine from previous mongo installation in your system is not mmapv1. Cancelling"
-    exit 1
-}
+#print_mongo_storage_engine_error_and_exit(){
+#    errcho "Storage engine from previous mongo installation in your system is not mmapv1. Cancelling"
+#    exit 1
+#}
+
 print_mongo_connection_failed_error_and_exit(){
     errcho "Connection failed to previous installed mongo in your system. Cancelling"
     exit 1
@@ -378,24 +378,28 @@ npm_install_node(){
 apt_configure_mongo(){
     local deb_keyserver="hkp://keyserver.ubuntu.com:80"
     local deb_key="9DA31620334BD75D9DCB49F368818C72E52529D4"
-    local ubuntu_mongo_url="deb [ arch=amd64 ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/4.0 multiverse"
-    local debian_mongo_url="deb http://repo.mongodb.org/apt/debian stretch/mongodb-org/4.0 main"
+    if [[ $MONGO_VERSION{0:2} == "4.0" ]]; then
+        ubuntu_mongo_url="deb [ arch=amd64 ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/4.0 multiverse"
+    else
+        local ubuntu_mongo_url="deb [ arch=amd64 ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/4.2 multiverse"
+    fi
+    local debian_mongo_url="deb http://repo.mongodb.org/apt/debian stretch/mongodb-org/4.2 main"
 
     if [ "$distro" == "ubuntu" ]; then
         apt-key adv --keyserver $deb_keyserver --recv $deb_key
-        echo $ubuntu_mongo_url | tee /etc/apt/sources.list.d/mongodb-org-4.0.list
+        echo $ubuntu_mongo_url | tee /etc/apt/sources.list.d/mongodb-org-4.list
     elif [ "$distro" == "debian" ]; then
         apt-get install -y dirmngr libcap2-bin
         apt-key adv --keyserver $deb_keyserver --recv $deb_key
-        echo $debian_mongo_url | tee /etc/apt/sources.list.d/mongodb-org-4.0.list
+        echo $debian_mongo_url | tee /etc/apt/sources.list.d/mongodb-org-4.list
     fi
 }
 
 yum_configure_mongo(){
-    local yum_mongo_url="https://repo.mongodb.org/yum/redhat/7/mongodb-org/4.0/x86_64/"
-    local yum_key="https://www.mongodb.org/static/pgp/server-4.0.asc"
-    cat << EOF | tee -a /etc/yum.repos.d/mongodb-org-4.0.repo
-[mongodb-org-4.0]
+    local yum_mongo_url="https://repo.mongodb.org/yum/redhat/7/mongodb-org/4.2/x86_64/"
+    local yum_key="https://www.mongodb.org/static/pgp/server-4.2.asc"
+    cat << EOF | tee -a /etc/yum.repos.d/mongodb-org-4.2.repo
+[mongodb-org-4.2]
 name=MongoDB Repository
 baseurl=$yum_mongo_url
 gpgcheck=1
@@ -427,7 +431,7 @@ yum_install_mongo(){
 }
 
 configure_mongo(){
-    sed -i "s/^#  engine:/  engine: mmapv1/"  /etc/mongod.conf
+    #sed -i "s/^#  engine:/  engine: mmapv1/"  /etc/mongod.conf
     sed -i "s/^#replication:/replication:\n  replSetName: rs01/" /etc/mongod.conf
     if ! grep -Fq "  fork: true" /etc/mongod.conf; then
         sed -i "/^processManagement:/a\  fork: true" /etc/mongod.conf
@@ -795,12 +799,13 @@ do_setup(){
         if [[ -n $(pgrep mongod) ]]; then
             mongo --eval "printjson(db.getUsers())" | grep "Error: command usersInfo requires authentication"
             if [ $? -eq 1 ]; then
-                storage=$(mongo --eval "printjson(db.serverStatus().storageEngine)" |grep name |awk -F: '{print $2}'|tr -d , |tr -d \")
-                if [ $storage == "mmapv1" ]; then
-                    interactive_mongo
-                else
-                    print_mongo_storage_engine_error_and_exit
-                fi
+                interactive_mongo
+                #storage=$(mongo --eval "printjson(db.serverStatus().storageEngine)" |grep name |awk -F: '{print $2}'|tr -d , |tr -d \")
+                #if [ $storage == "mmapv1" ]; then
+                #    interactive_mongo
+                #else
+                #    print_mongo_storage_engine_error_and_exit
+                #fi
             else
                 print_mongo_connection_failed_error_and_exit
             fi
@@ -891,7 +896,7 @@ do_check_updates(){
     get_rocketchat_latest_version
     get_rocketchat_current_version
     print_make_backup
-    if ([[ $current_rocketchat_version =~ ^([0-2]\..\..)$ ]] && [[ ${latest_rocketchat_version:0:2} -eq 3 ]]); then
+    if ([[ $current_rocketchat_version =~ ^([0-2]\..\..)$ ]] && [[ ${latest_rocketchat_version:0:1} -eq 3 ]]); then
         update_node=1
         print_check_update_change_node_version
         print_update_available_and_exit
@@ -1152,8 +1157,8 @@ do_backup(){
 main() {
 
     local VERSION="latest"
-    local -r NODE_VERSION="v12.14.0"
-    local -r NPM_VERSION="6.13.4"
+    local -r NODE_VERSION="v12.16.1"
+    local -r NPM_VERSION="6.14.0"
     local MONGO_VERSION=""
     local -r MONGO_URL="mongodb://localhost:27017/rocketchat?replicaSet=rs01"
     local -r MONGO_OPLOG_URL="mongodb://localhost:27017/local?replicaSet=rs01"
