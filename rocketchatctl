@@ -1149,8 +1149,8 @@ do_backup(){
 main() {
 
     local VERSION="latest"
-    local -r NODE_VERSION="v12.14.0"
-    local -r NPM_VERSION="6.13.4"
+    local -r NODE_VERSION="v12.18.4"
+    local -r NPM_VERSION="6.14.8"
     local MONGO_VERSION=""
     local -r MONGO_URL="mongodb://localhost:27017/rocketchat?replicaSet=rs01"
     local -r MONGO_OPLOG_URL="mongodb://localhost:27017/local?replicaSet=rs01"
