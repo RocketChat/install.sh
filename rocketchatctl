@@ -476,9 +476,6 @@ create_rocketchat_systemd_file(){
     if [[ $webserver != "none" ]] && $bind_loopback; then
         BIND_IP="127.0.0.1"
     fi
-    if [[ $distro == "centos" ]]; then
-        node_path="/usr/local/bin/node"
-    fi
     cat << EOF | tee -a /lib/systemd/system/rocketchat.service
 [Unit]
 Description=The Rocket.Chat server
@@ -1152,8 +1149,8 @@ do_backup(){
 main() {
 
     local VERSION="latest"
-    local -r NODE_VERSION="v12.14.0"
-    local -r NPM_VERSION="6.13.4"
+    local -r NODE_VERSION="v12.18.4"
+    local -r NPM_VERSION="6.14.8"
     local MONGO_VERSION=""
     local -r MONGO_URL="mongodb://localhost:27017/rocketchat?replicaSet=rs01"
     local -r MONGO_OPLOG_URL="mongodb://localhost:27017/local?replicaSet=rs01"
@@ -1193,7 +1190,7 @@ main() {
     local configure_webserver=0
     local root_url_arg=0
     local sufix=$(date +%s)
-    local node_path="/usr/bin/node"
+    local node_path="/usr/local/bin/node"
     local backup_dir="/tmp"
     local update_node=0
     
