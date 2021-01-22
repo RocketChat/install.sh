@@ -512,6 +512,10 @@ get_rocketchat_domain(){
     rocket_domain=$(echo $ROOT_URL | awk -F[/:] '{print $4}')
 }
 
+get_mongo_storage_engine(){
+    storage=$(mongo --eval "printjson(db.serverStatus().storageEngine)" |grep name |awk -F: '{print $2}'|tr -d , |tr -d \" | tr -d '[:space:]')
+}
+
 traefik_config_file(){
     if [ -f /etc/traefik/traefik.toml ]; then
         sufix=$(date +%s)
@@ -792,7 +796,7 @@ do_setup(){
         if [[ -n $(pgrep mongod) ]]; then
             mongo --eval "printjson(db.getUsers())" | grep "Error: command usersInfo requires authentication"
             if [ $? -eq 1 ]; then
-                storage=$(mongo --eval "printjson(db.serverStatus().storageEngine)" |grep name |awk -F: '{print $2}'|tr -d , |tr -d \")
+                get_mongo_storage_engine
                 if [ $storage == "mmapv1" ]; then
                     interactive_mongo
                 else
