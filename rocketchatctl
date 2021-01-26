@@ -84,7 +84,7 @@ print_mongo_version_not_supported_and_exit(){
 }
 
 print_check_mongo_storage_and_exit(){
-    errcho "IMPORTANT: Starting with Rocket.Chat version 4.X, a \"wirdTiger\" storage engine is required in MongoDB. Please migrate your existing database first: https://docs.rocket.chat/installation/manual-installation/mongodb-mmap-to-wiredtiger-migration"
+    errcho "IMPORTANT: Starting with Rocket.Chat version 4.X, a \"wiredTiger\" storage engine is required in MongoDB. Please migrate your existing database first: https://docs.rocket.chat/installation/manual-installation/mongodb-mmap-to-wiredtiger-migration"
     exit 1
 }
 
