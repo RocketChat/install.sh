@@ -762,7 +762,7 @@ get_rocketchat_latest_version(){
 
 get_rocketchat_current_version(){
     if systemctl status rocketchat > /dev/null 2>&1; then
-        PORT=$(cat /lib/systemd/system/rocketchat.service |grep PORT |awk -F= '{print $3}')
+        PORT=$(cat /lib/systemd/system/rocketchat.service |grep PORT |awk -F'PORT=' '{print $NF}')
         current_rocketchat_version=$(curl http://localhost:$PORT/api/info 2>/dev/null |cut -d\" -f4)
     else
         print_rocketchat_not_running_error_and_exit
