@@ -777,7 +777,7 @@ rocketchat_health_check(){
     local count=0
     while ! ([ $rocket_healthy -eq  1 ] || [ $count -eq 150 ]); do
         get_rocketchat_current_version
-        [[ $current_rocketchat_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] && rocket_healthy=1
+        [[ $current_rocketchat_version =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] && rocket_healthy=1
         sleep 2
         ((count++))
         echo "Waiting up to 5 minutes for RocketChat server to be active ... $(($count * 2))"
