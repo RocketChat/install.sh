@@ -460,7 +460,7 @@ initiate_and_start_mongo(){
 install_rocketchat(){
     curl -L $ROCKETCHAT_DOWNLOAD_URL -o /tmp/rocket.chat.tgz
     tar -xzf /tmp/rocket.chat.tgz -C /tmp
-    cd /tmp/bundle/programs/server && npm install
+    cd /tmp/bundle/programs/server && npm install --unsafe-perm
     # add npm install node-gyp@5.0.1 to fix 4 moderate severity vulnerabilities
     mv /tmp/bundle $ROCKETCHAT_DIR
     rm /tmp/rocket.chat.tgz
