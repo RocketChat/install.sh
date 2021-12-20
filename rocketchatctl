@@ -228,6 +228,9 @@ os_supported(){
         centos)
             [[ "$distro_version" =~ (("7"|"8")) ]] || print_distro_not_supported_error_and_exit
             ;;
+        rocky)
+            [[ "$distro_version" =~ (("8")) ]] || print_distro_not_supported_error_and_exit
+            ;;
         *)
             print_distro_not_supported_error_and_exit
             ;;
@@ -850,7 +853,7 @@ do_install(){
                 initiate_and_start_mongo
             fi
             ;;
-        centos)
+        centos|rocky)
             yum -y check-update
             yum install -y curl
             # node
@@ -948,7 +951,7 @@ do_update_node(){
         ubuntu|debian)
             apt_install_node
             ;;
-        centos)
+        centos|rocky)
             yum_install_node
             ;;
         *)
