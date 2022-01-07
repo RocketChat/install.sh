@@ -35,6 +35,7 @@ FOR UNATTENDED INSTALLATION
                             default database name rocketchat
   --mongo-version=4.x.x     mongo 4 version, default value is latest (supported only for Debian and Ubuntu)
   --bind-loopback=value     value=(true|false) set to false to prevent from bind RocketChat server to loopback interface when installing a webserver (default true)
+  --reg-token=TOKEN         This value can be obtained from https://cloud.rocket.chat to automatically register your workspace during startup
 
 FOR CONFIGURE OPTION
   --rocketchat --root-url=ROOT_URL --port=PORT --bind-loopback=value                  Reconfigures RocketChat server Site-URL and port (--root-url REQUIRED)
@@ -220,7 +221,7 @@ os_supported(){
     get_os_distro
     case "$distro" in
         ubuntu)
-            [[ "$distro_version" =~ (("18.04"|"19.04"|"19.10"|"20.04")) ]] || print_distro_not_supported_error_and_exit
+            [[ "$distro_version" =~ (("18.04"|"19.04"|"19.10"|"20.04"|"21.04"|"21.10")) ]] || print_distro_not_supported_error_and_exit
             ;;
         debian)
             [[ "$distro_version" =~ (("9"|"10")) ]] || print_distro_not_supported_error_and_exit
@@ -352,6 +353,14 @@ check_arguments_unattended_install() {
                     exit 2
                 fi
                 bind_loopback="${args[1]}"
+                ;;
+            --reg-token)
+                if [ ${#args[@]} -ne 2 ]; then
+                    error_with_no_value_specified "${args[0]}"
+                    exit 2
+                fi
+
+                REG_TOKEN="${args[1]}"
                 ;;
             *)
                 show_help
@@ -497,6 +506,7 @@ Environment=ROOT_URL=$ROOT_URL
 Environment=PORT=$PORT
 Environment=BIND_IP=$BIND_IP
 Environment=DEPLOY_PLATFORM=rocketchatctl
+Environment=REG_TOKEN=$REG_TOKEN
 [Install]
 WantedBy=multi-user.target
 EOF
@@ -1190,6 +1200,7 @@ main() {
     local ROOT_URL=""
     local PORT=3000
     local BIND_IP="0.0.0.0"
+    local REG_TOKEN=""
     local bind_loopback=true
     local webserver=none
     local install_node_arg=0
