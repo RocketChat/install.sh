@@ -2,7 +2,7 @@
 set -o nounset
 
 errcho() {
-  echo ""$@"" >&2
+  echo "$@" >&2
 }
 
 show_help() {
@@ -207,7 +207,7 @@ print_done() {
 }
 
 command_exists() {
-  command -v ""$@"" > /dev/null 2>&1
+  command -v "$@" > /dev/null 2>&1
 }
 
 get_os_distro() {
@@ -459,7 +459,7 @@ initiate_and_start_mongo() {
   systemctl daemon-reload
   systemctl enable mongod
   systemctl start mongod
-  if [ -n $(pgrep mongod) ]; then
+  if [[ -n $(pgrep mongod) ]]; then
     mongo --eval "printjson(rs.initiate())" >&2
   fi
 }
@@ -778,7 +778,7 @@ get_rocketchat_current_version() {
 }
 
 version_gt() {
-  test "$(printf '%s\n' ""$@"" | sort -V | head -n 1)" != "$1"
+  test "$(printf '%s\n' "$@" | sort -V | head -n 1)" != "$1"
 }
 
 rocketchat_health_check() {
