@@ -1130,9 +1130,18 @@ get_supported_node_version() {
 }
 
 do_install_node() {
-  # if called just to update, node version check's been already done and assume either n or nvm being installed
-  [[ ${FUNCNAME[1]} != "do_update_node" ]] &&
-    command_exists node && [[ $(node --version 2> /dev/null) == "$NODE_VERSION" ]] && NODE_BIN=$(which node) && return
+  # if called just to update, node version check's been already done
+  if [[ ${FUNCNAME[1]} != "do_update_node" ]]; then
+    if command_exists node; then
+      if [[ $(node --version 2> /dev/null) == "$NODE_VERSION" ]]; then
+        NODE_BIN=$(which node)
+        return
+      else
+        ((install_node_arg)) || print_node_version_error_and_exit
+      fi
+    fi
+  fi
+
   if command_exists n; then
     # since previously this script used n
     n $NODE_VERSION
@@ -1188,7 +1197,6 @@ main() {
   local root_url_arg=0
   local sufix=$(date +%s)
   local backup_dir="/tmp"
-  local update_node=0
 
   [ ${EUID} -ne 0 ] && print_run_as_root_error_and_exit
   [ $# -lt 1 ] && print_incorrect_parameters_error_and_exit
