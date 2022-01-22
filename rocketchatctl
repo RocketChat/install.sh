@@ -911,7 +911,7 @@ do_update_node() {
   local currently_used_node_path=$(awk -F'[= ]' '$1 == "ExecStart" {print $2}' /lib/systemd/system/rocketchat.service)
   [[ $($currently_used_node_path --version 2> /dev/null) == "$NODE_VERSION" ]] && return
   do_install_node
-  sed -i "s@^\(ExecStart\)=$currently_used_node_path \{1,\}\(.\+\)\$@\1=$NODE_BIN \2@" /lib/systemd/system/rocketchat.service
+  sed -Ei "s@^(ExecStart)=$currently_used_node_path {1,}(.+)\$@\1=$NODE_BIN \2@" /lib/systemd/system/rocketchat.service
   check_node_major_version || print_node_not_updated_error_and_exit
 }
 
