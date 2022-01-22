@@ -1125,7 +1125,7 @@ get_supported_node_version() {
   # if api returns nodeVersion, then use that
   # else it's pre node14 days
   local node_version=$(curl -s "$ROCKET_VERSION_INFO_URL" | jq -r '.nodeVersion // empty')
-  [[ -n $node_version ]] && NODE_VERSION=$node_version || NODE_VERSION="v12.22.8"
+  NODE_VERSION=${node_version:-v12.22.8}
 }
 
 do_install_node() {
