@@ -241,16 +241,6 @@ mongo_version_supported() {
   fi
 }
 
-interactive_node() {
-  if [ ${install_node_arg} -eq 0 ]; then
-    read -r -p "Your current node version is $node_version. RocketChat server uses node $NODE_VERSION.
-If you decide to continue, node will be installed using npm and it will become your default system node version.
-Do you want to install node anyway and use it system wide? (y/n) " install_node_answer
-    echo -e ""
-    [ "${install_node_answer}" == 'y' ] && install_node_arg=1 || print_node_version_error_and_exit
-  fi
-}
-
 interactive_mongo() {
   if [ ${use_mongo_arg} -eq 0 ]; then
     read -r -p "It appears you already have mongo installed, this script will skip mongo installation but can't assure successful RocketChat server installation.
@@ -369,24 +359,6 @@ check_arguments_unattended_install() {
   done
 }
 
-apt_install_node() {
-  curl -sL $NODE_DEB_DOWNLOAD_URL | bash -
-  apt-get install -y build-essential graphicsmagick
-  apt-get install -y nodejs
-}
-
-yum_install_node() {
-  curl -sL $NODE_RPM_DOWNLOAD_URL | bash -
-  yum install -y gcc-c++ make nodejs
-  yum install -y epel-release
-  yum install -y GraphicsMagick
-}
-
-npm_install_node() {
-  npm install -g npm@$NPM_VERSION
-  npm install -g inherits node-gyp@4.0.0 n && n $NODE_VERSION
-}
-
 apt_configure_mongo() {
   local deb_keyserver="hkp://keyserver.ubuntu.com:80"
   local deb_key="9DA31620334BD75D9DCB49F368818C72E52529D4"
@@ -493,7 +465,7 @@ create_rocketchat_systemd_file() {
 Description=The Rocket.Chat server
 After=network.target remote-fs.target nss-lookup.target mongod.service
 [Service]
-ExecStart=$node_path /opt/Rocket.Chat/main.js
+ExecStart=$NODE_BIN /opt/Rocket.Chat/main.js
 StandardOutput=syslog
 StandardError=syslog
 SyslogIdentifier=rocketchat
@@ -795,15 +767,20 @@ rocketchat_health_check() {
 do_setup() {
   # checks system before install: node, mongo, rocketchat
   # assigns user's values
+
+  # update environment and install necessary packages
+  case "$distro" in
+    ubuntu | debian) apt update -qqq && apt install curl jq build-essential graphicsmagick -yqqq ;;
+    centos)
+            yum -y check-update && yum install gcc-c++ make jq curl -y
+            yum install -y epel-release
+            yum install GraphicsMagick -y
+      ;;
+  esac
+
   # node
-  if command_exists node; then
-    node_version=$(node --version 2> /dev/null)
-    if [ "$node_version" != "$NODE_VERSION" ]; then
-      interactive_node
-    fi
-  else
-    install_node=1
-  fi
+  get_supported_node_version
+
   # mongo
   if command_exists mongod; then
     if [[ -n $(pgrep mongod) ]]; then
@@ -838,17 +815,10 @@ do_setup() {
 }
 
 do_install() {
+  # install node out here since it doesn't depend on the distribution
+  do_install_node
   case "$distro" in
     ubuntu | debian)
-      apt-get -y update
-      apt-get install -y curl
-      # node
-      if [ $install_node -eq 1 ]; then
-        apt_install_node
-        npm_install_node
-      elif [ $install_node_arg -eq 1 ]; then
-        npm_install_node
-      fi
       # mongo
       if [ $install_mongo -eq 1 ]; then
         apt_configure_mongo
@@ -859,15 +829,6 @@ do_install() {
       fi
       ;;
     centos)
-      yum -y check-update
-      yum install -y curl
-      # node
-      if [ $install_node -eq 1 ]; then
-        yum_install_node
-        npm_install_node
-      elif [ $install_node_arg -eq 1 ]; then
-        npm_install_node
-      fi
       # mongo
       if [ $install_mongo -eq 1 ]; then
         yum_configure_mongo
@@ -908,10 +869,6 @@ do_check_updates() {
   get_mongo_storage_engine
   if ([[ $storage == "mmapv1" ]] && [[ ${latest_rocketchat_version:0:1} -eq 4 ]]); then
     print_check_mongo_storage_and_exit
-  elif ([[ $current_rocketchat_version =~ ^([0-2]\..\..)$ ]] && [[ ${latest_rocketchat_version:0:2} -eq 3 ]]); then
-    update_node=1
-    print_check_update_change_node_version
-    print_update_available_and_exit
   elif version_gt $latest_rocketchat_version $current_rocketchat_version; then
     print_update_available_and_exit
   elif [ $latest_rocketchat_version == $current_rocketchat_version ]; then
@@ -922,9 +879,7 @@ do_check_updates() {
 }
 
 do_update() {
-  if [ $update_node -eq 1 ]; then
-    do_update_node
-  fi
+  do_update_node
   mv $ROCKETCHAT_DIR $ROCKETCHAT_DIR_UPDATE
   if [ $? == 0 ]; then
     systemctl stop rocketchat
@@ -952,17 +907,11 @@ check_node_major_version() {
 }
 
 do_update_node() {
-  case "$distro" in
-    ubuntu | debian)
-      apt_install_node
-      ;;
-    centos)
-      yum_install_node
-      ;;
-    *) ;;
-
-  esac
-  npm_install_node
+  get_supported_node_version
+  local currently_used_node_path=$(awk -F'[= ]' '$1 == "ExecStart" {print $2}' /lib/systemd/system/rocketchat.service)
+  [[ $($currently_used_node_path --version 2> /dev/null) == "$NODE_VERSION" ]] && return
+  do_install_node
+  sed -Ei "s@^(ExecStart)=$currently_used_node_path {1,}(.+)\$@\1=$NODE_BIN \2@" /lib/systemd/system/rocketchat.service
   check_node_major_version || print_node_not_updated_error_and_exit
 }
 
@@ -1164,19 +1113,57 @@ do_backup() {
   fi
 }
 
-main() {
+do_install_nvm() {
+  # if n not found, install nvm to manage node versions
+  mkdir /opt/nvm
+  local nvm_version=$(curl -s https://api.github.com/repos/nvm-sh/nvm/releases/latest | jq .tag_name -r)
+  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/$nvm_version/install.sh | NVM_DIR=/opt/nvm bash
+  source /opt/nvm/nvm.sh # ensure nvm and other node commands are available for the current session
+}
 
+get_supported_node_version() {
+  # if api returns nodeVersion, then use that
+  # else it's pre node14 days
+  local node_version=$(curl -s "$ROCKET_VERSION_INFO_URL" | jq -r '.nodeVersion // empty')
+  NODE_VERSION=${node_version:-v12.22.8}
+}
+
+do_install_node() {
+  # if called just to update, node version check's been already done
+  if [[ ${FUNCNAME[1]} != "do_update_node" ]]; then
+    if command_exists node; then
+      if [[ $(node --version 2> /dev/null) == "$NODE_VERSION" ]]; then
+        NODE_BIN=$(which node)
+        return
+      else
+        ((install_node_arg)) || print_node_version_error_and_exit
+      fi
+    fi
+  fi
+
+  if command_exists n; then
+    # since previously this script used n
+    n $NODE_VERSION
+    NODE_BIN=$(n which $NODE_VERSION)
+  else
+    command_exists nvm || { test -s /opt/nvm/nvm.sh && source $_ || do_install_nvm; }
+    nvm i $NODE_VERSION
+    NODE_BIN=$(nvm which $NODE_VERSION)
+  fi
+}
+
+main() {
   local VERSION="latest"
   # TODO: make this dynamic
-  local -r NODE_VERSION="v12.18.4"
-  local -r NPM_VERSION="6.14.8"
+  # local -r NODE_VERSION="v12.18.4"
+  local NODE_VERSION=""
+  local NODE_BIN=''
+  # local -r NPM_VERSION="6.14.8"
   local MONGO_VERSION=""
   local -r MONGO_URL="mongodb://localhost:27017/rocketchat?replicaSet=rs01"
   local -r MONGO_OPLOG_URL="mongodb://localhost:27017/local?replicaSet=rs01"
 
   local ROCKETCHAT_DOWNLOAD_URL="https://releases.rocket.chat/$VERSION/download"
-  local -r NODE_DEB_DOWNLOAD_URL="https://deb.nodesource.com/setup_12.x"
-  local -r NODE_RPM_DOWNLOAD_URL="https://rpm.nodesource.com/setup_12.x"
   local -r ROCKETCHAT_DIR="/opt/Rocket.Chat"
   local -r ROCKETCHAT_DIR_UPDATE="/opt/Rocket.Chat.bkup"
   local -r ROCKET_VERSION_INFO_URL="https://releases.rocket.chat/latest/info"
@@ -1190,7 +1177,6 @@ main() {
 
   local distro=""
   local distro_version=""
-  local install_node=0
   local install_mongo=0
   local rocket_healthy=0
 
@@ -1200,7 +1186,6 @@ main() {
   local REG_TOKEN=""
   local bind_loopback=true
   local webserver=none
-  local install_node_arg=0
   local use_mongo_arg=0
   local webserver_arg=0
   local rocket_mail_arg=0
@@ -1210,9 +1195,7 @@ main() {
   local configure_webserver=0
   local root_url_arg=0
   local sufix=$(date +%s)
-  local node_path="/usr/local/bin/node"
   local backup_dir="/tmp"
-  local update_node=0
 
   [ ${EUID} -ne 0 ] && print_run_as_root_error_and_exit
   [ $# -lt 1 ] && print_incorrect_parameters_error_and_exit
