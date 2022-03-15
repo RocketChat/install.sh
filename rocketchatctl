@@ -26,12 +26,12 @@ OPTIONS
 
 FOR UNATTENDED INSTALLATION
   --root-url=ROOT_URL       the public URL where RocketChat server will be accessible on the Internet (REQUIRED)
-  --port=PORT               port for the RocketChat server, default value 3000   
+  --port=PORT               port for the RocketChat server, default value 3000
   --webserver=WEBSERVER     webserver to install as reverse proxy for RocketChat server, options are caddy/traefik/none (REQUIRED)
   --letsencrypt-email=EMAIL e-mail address to use for SSL certificates (REQUIRED if webserver is not none)
   --version=VERSION         RocketChat server version to install, default latest
   --install-node            in case node installed, sets node to RocketChat server recommended version, default behavoir cancel RocketChat server installation
-  --use-mongo               in case mongo installed, and storage engine configured is wiredTiger, skip mongo installation but uses systems mongo for RocketChat server database, 
+  --use-mongo               in case mongo installed, and storage engine configured is wiredTiger, skip mongo installation but uses systems mongo for RocketChat server database,
                             default database name rocketchat
   --mongo-version=4.x.x     mongo 4 version, default value is latest (supported only for Debian and Ubuntu)
   --bind-loopback=value     value=(true|false) set to false to prevent from bind RocketChat server to loopback interface when installing a webserver (default true)
@@ -214,6 +214,7 @@ get_os_distro() {
   if [ -r /etc/os-release ]; then
     distro="$(. /etc/os-release && echo "$ID")"
     distro_version="$(. /etc/os-release && echo "$VERSION_ID")"
+    distro_codename="$(. /etc/os-release && echo $VERSION_CODENAME)"
   fi
 }
 
@@ -360,19 +361,23 @@ check_arguments_unattended_install() {
 }
 
 apt_configure_mongo() {
-  local deb_keyserver="hkp://keyserver.ubuntu.com:80"
-  local deb_key="9DA31620334BD75D9DCB49F368818C72E52529D4"
-  local ubuntu_mongo_url="deb [ arch=amd64 ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/4.0 multiverse"
-  local debian_mongo_url="deb http://repo.mongodb.org/apt/debian stretch/mongodb-org/4.0 main"
+  local key_url="https://www.mongodb.org/static/pgp/server-$MONGO_VERSION_WITHOUT_PATCH.asc"
+  local key_file="/usr/share/keyrings/mongodb-org-$MONGO_VERSION_WITHOUT_PATCH.gpg"
+  local repo_url
+  local repo_file="/etc/apt/sources.list.d/mongodb-org-$MONGO_VERSION_WITHOUT_PATCH.list"
 
-  if [ "$distro" == "ubuntu" ]; then
-    apt-key adv --keyserver $deb_keyserver --recv $deb_key
-    echo $ubuntu_mongo_url | tee /etc/apt/sources.list.d/mongodb-org-4.0.list
-  elif [ "$distro" == "debian" ]; then
-    apt-get install -y dirmngr libcap2-bin
-    apt-key adv --keyserver $deb_keyserver --recv $deb_key
-    echo $debian_mongo_url | tee /etc/apt/sources.list.d/mongodb-org-4.0.list
-  fi
+  case $distro in
+    "ubuntu")
+      repo_url="deb [ arch=amd64 signed-by=$key_file ] https://repo.mongodb.org/apt/ubuntu $distro_codename/mongodb-org/$MONGO_VERSION_WITHOUT_PATCH multiverse"
+      ;;
+    "debian")
+      repo_url="deb [ arch=amd64 signed-by=$key_file ] http://repo.mongodb.org/apt/debian $distro_codename/mongodb-org/$MONGO_VERSION_WITHOUT_PATCH main"
+      ;;
+  esac
+
+  curl -fsSL "$key_url" | gpg --dearmor -o "$key_file"
+
+  echo $repo_url > $repo_file
 }
 
 yum_configure_mongo() {
@@ -389,6 +394,7 @@ EOF
 }
 
 apt_install_mongo() {
+  # assuming mongodb is installed
   apt-get update
   if [ -z "${MONGO_VERSION}" ]; then
     apt-get install -y mongodb-org
@@ -770,22 +776,28 @@ do_setup() {
 
   # update environment and install necessary packages
   case "$distro" in
-    ubuntu | debian) apt update -qqq && apt install curl jq build-essential graphicsmagick -yqqq ;;
+    ubuntu | debian)
+        apt update -qqq &&
+          apt install curl jq build-essential graphicsmagick -yqqq
+      ;;
     centos)
-            yum -y check-update && yum install gcc-c++ make jq curl -y
-            yum install -y epel-release
-            yum install GraphicsMagick -y
+        yum -y check-update && {
+          yum install gcc-c++ make jq curl -y
+          yum install -y epel-release
+          yum install GraphicsMagick -y
+        }
       ;;
   esac
 
   # node
   get_supported_node_version
+  # mongodb
+  get_supported_mongo_version
 
   # mongo
   if command_exists mongod; then
     if [[ -n $(pgrep mongod) ]]; then
-      mongo --eval "printjson(db.getUsers())" | grep "Error: command usersInfo requires authentication"
-      if [ $? -eq 1 ]; then
+      if ! mongo --eval "printjson(db.getUsers())" | grep -q "Error: command usersInfo requires authentication"; then
         get_mongo_storage_engine
         if [ $storage == "wiredTiger" ]; then
           interactive_mongo
@@ -799,6 +811,7 @@ do_setup() {
       print_mongo_connection_failed_error_and_exit
     fi
   else
+    # mongodb doesn't exist
     mongo_version_supported
     install_mongo=1
   fi
@@ -814,33 +827,35 @@ do_setup() {
   interactive_mail
 }
 
-do_install() {
-  # install node out here since it doesn't depend on the distribution
-  do_install_node
-  case "$distro" in
-    ubuntu | debian)
-      # mongo
-      if [ $install_mongo -eq 1 ]; then
+do_install_mongo() {
+  if (( $install_mongo == 1 )); then
+    case "$distro" in
+      ubuntu | debian)
         apt_configure_mongo
         apt_install_mongo
         configure_mongo
         create_mongo_systemd_file
         initiate_and_start_mongo
-      fi
       ;;
-    centos)
-      # mongo
-      if [ $install_mongo -eq 1 ]; then
+      centos)
         yum_configure_mongo
         yum_install_mongo
         configure_mongo
+        create_mongo_systemd_file
         initiate_and_start_mongo
-      fi
       ;;
-    *)
-      print_distro_not_supported_error_and_exit
+      *)
+        print_distro_not_supported_error_and_exit
       ;;
-  esac
+    esac
+  fi
+}
+
+do_install() {
+  # install node out here since it doesn't depend on the distribution
+  do_install_node
+  do_install_mongo
+
   # rocketchat
   if ! [ -d ${ROCKETCHAT_DIR} ]; then
     install_rocketchat
@@ -1126,6 +1141,21 @@ get_supported_node_version() {
   # else it's pre node14 days
   local node_version=$(curl -s "$ROCKET_VERSION_INFO_URL" | jq -r '.nodeVersion // empty')
   NODE_VERSION=${node_version:-v12.22.8}
+}
+
+get_supported_mongo_version() {
+  # jq query takes the latest supported mongo version
+  local mongo_version=$(
+    curl -s "$ROCKET_VERSION_INFO_URL" | jq -r 'sort_by(.compatibleMongoVersions) | reverse | .[0] // empty'
+  )
+
+  # this is bashy - fyi
+  # so don't do `sh rocketchatctl`
+  # either `bash rocketchatctl` or `./rocketchatctl`
+  mongo_version=(${mongo_version/./ })
+  MONGO_VERSION_MAJOR=${mongo_version[0]}
+  MONGO_VERSION_MINOR=${mongo_version[1]}
+  MONGO_VERSION_WITHOUT_PATCH="$MONGO_VERSION_MAJOR.$MONGO_VERSION_MINOR"
 }
 
 do_install_node() {
