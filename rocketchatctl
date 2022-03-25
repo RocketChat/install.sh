@@ -286,6 +286,9 @@ check_arguments_unattended_install() {
     IFS='=' read -r -a args <<< $1
     case "${args[0]}" in
       --dry-run)
+        printf "[WARNING] --dry-run is still experimental; some commands may still run; use with caution"
+        read -p "Do you want to continue? " con
+        [[ $con =~ ^y|Y$ ]] || { printf "Dry run aborted!"; exit 0; }
         dry_run=1
         run() {
           echo "$@"
