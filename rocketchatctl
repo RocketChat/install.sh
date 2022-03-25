@@ -363,17 +363,12 @@ check_arguments_unattended_install() {
 apt_configure_mongo() {
   local key_url="https://www.mongodb.org/static/pgp/server-$MONGO_VERSION_WITHOUT_PATCH.asc"
   local key_file="/usr/share/keyrings/mongodb-org-$MONGO_VERSION_WITHOUT_PATCH.gpg"
-  local repo_url
   local repo_file="/etc/apt/sources.list.d/mongodb-org-$MONGO_VERSION_WITHOUT_PATCH.list"
 
-  case $distro in
-    "ubuntu")
-      repo_url="deb [ arch=amd64 signed-by=$key_file ] https://repo.mongodb.org/apt/ubuntu $distro_codename/mongodb-org/$MONGO_VERSION_WITHOUT_PATCH multiverse"
-      ;;
-    "debian")
-      repo_url="deb [ arch=amd64 signed-by=$key_file ] http://repo.mongodb.org/apt/debian $distro_codename/mongodb-org/$MONGO_VERSION_WITHOUT_PATCH main"
-      ;;
-  esac
+  declare -A repo=([ubuntu]=multiverse [debian]=main)
+
+  local repo_url="deb [ arch=amd64 signed-by=$key_file ] https://repo.mongodb.org/apt/$distro $distro_codename/mongodb-org/$MONGO_VERSION_WITHOUT_PATCH ${repo[$distro]}"
+
 
   curl -fsSL "$key_url" | gpg --dearmor -o "$key_file"
 
@@ -394,22 +389,13 @@ EOF
 }
 
 apt_install_mongo() {
-  # assuming mongodb is installed
-  apt-get update
-  if [ -z "${MONGO_VERSION}" ]; then
-    apt-get install -y mongodb-org
-  else
-    apt-get install -y mongodb-org=$MONGO_VERSION \
-      mongodb-org-server=$MONGO_VERSION \
-      mongodb-org-shell=$MONGO_VERSION \
-      mongodb-org-mongos=$MONGO_VERSION \
-      mongodb-org-tools=$MONGO_VERSION
-    echo "mongodb-org hold" | sudo dpkg --set-selections
-    echo "mongodb-org-server hold" | sudo dpkg --set-selections
-    echo "mongodb-org-shell hold" | sudo dpkg --set-selections
-    echo "mongodb-org-mongos hold" | sudo dpkg --set-selections
-    echo "mongodb-org-tools hold" | sudo dpkg --set-selections
-  fi
+  apt-get update -qqq
+  apt install mongodb-org -y
+  printf "mongodb-org hold" | dpkg --set-selections
+  printf "mongodb-org-server hold" | dpkg --set-selections
+  printf "mongodb-org-shell hold" | dpkg --set-selections
+  printf "mongodb-org-mongos hold" | dpkg --set-selections
+  printf "mongodb-org-tools hold" | dpkg --set-selections
 }
 
 yum_install_mongo() {
@@ -775,6 +761,7 @@ do_setup() {
   # assigns user's values
 
   # update environment and install necessary packages
+  # TODO: add gnupg; find out the package name for deb & rpm
   case "$distro" in
     ubuntu | debian)
         apt update -qqq &&
@@ -828,7 +815,7 @@ do_setup() {
 }
 
 do_install_mongo() {
-  if (( $install_mongo == 1 )); then
+  if ((install_mongo)); then
     case "$distro" in
       ubuntu | debian)
         apt_configure_mongo
@@ -1155,7 +1142,11 @@ get_supported_mongo_version() {
   mongo_version=(${mongo_version/./ })
   MONGO_VERSION_MAJOR=${mongo_version[0]}
   MONGO_VERSION_MINOR=${mongo_version[1]}
+  MONGO_VERSION_PATCH=${mongo_version[2]}
   MONGO_VERSION_WITHOUT_PATCH="$MONGO_VERSION_MAJOR.$MONGO_VERSION_MINOR"
+  # these two aren't really used
+  MONGO_VERSION_WITH_PATCH="$MONGO_VERSION_MAJOR.$MONGO_VERSION_MINOR.$MONGO_VERSION_PATCH"
+  MONGO_VERSION=$MONGO_VERSION_WITH_PATCH
 }
 
 do_install_node() {
