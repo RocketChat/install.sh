@@ -286,8 +286,8 @@ check_arguments_unattended_install() {
     IFS='=' read -r -a args <<< $1
     case "${args[0]}" in
       --dry-run)
-        printf "[WARNING] --dry-run is still experimental; some commands may still run; use with caution"
-        read -p "Do you want to continue? " con
+        printf "[WARNING] --dry-run is still experimental; some commands may still run; use with caution\n"
+        read -p "Do you want to continue? (Y|n) " con
         [[ $con =~ ^y|Y$ ]] || { printf "Dry run aborted!"; exit 0; }
         dry_run=1
         run() {
@@ -400,7 +400,7 @@ EOF
 apt_install_mongo() {
   run apt-get update -qqq
   run apt install mongodb-org -y
-  ((dry_run)) && {
+  ((dry_run)) || {
     printf "mongodb-org hold" | dpkg --set-selections
     printf "mongodb-org-server hold" | dpkg --set-selections
     printf "mongodb-org-shell hold" | dpkg --set-selections
@@ -775,8 +775,8 @@ do_setup() {
   # TODO: add gnupg; find out the package name for deb & rpm
   case "$distro" in
     ubuntu | debian)
-        run apt update -qqq &&
-          run apt install curl jq build-essential graphicsmagick -yqqq
+        apt update -qqq &&
+          apt install curl jq build-essential graphicsmagick -yqqq
       ;;
     centos)
         run yum -y check-update && {
@@ -1211,6 +1211,7 @@ main() {
   local distro_version=""
   local install_mongo=0
   local rocket_healthy=0
+  local dry_run=0
 
   local ROOT_URL=""
   local PORT=3000
