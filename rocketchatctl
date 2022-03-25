@@ -367,13 +367,13 @@ check_arguments_unattended_install() {
 }
 
 apt_configure_mongo() {
-  local key_url="https://www.mongodb.org/static/pgp/server-$MONGO_VERSION_WITHOUT_PATCH.asc"
-  local key_file="/usr/share/keyrings/mongodb-org-$MONGO_VERSION_WITHOUT_PATCH.gpg"
-  local repo_file="/etc/apt/sources.list.d/mongodb-org-$MONGO_VERSION_WITHOUT_PATCH.list"
+  local key_url="https://www.mongodb.org/static/pgp/server-$MONGO_VERSION.asc"
+  local key_file="/usr/share/keyrings/mongodb-org-$MONGO_VERSION.gpg"
+  local repo_file="/etc/apt/sources.list.d/mongodb-org-$MONGO_VERSION.list"
 
   declare -A repo=([ubuntu]=multiverse [debian]=main)
 
-  local repo_url="deb [ arch=amd64 signed-by=$key_file ] https://repo.mongodb.org/apt/$distro $distro_codename/mongodb-org/$MONGO_VERSION_WITHOUT_PATCH ${repo[$distro]}"
+  local repo_url="deb [ arch=amd64 signed-by=$key_file ] https://repo.mongodb.org/apt/$distro $distro_codename/mongodb-org/$MONGO_VERSION ${repo[$distro]}"
 
 
   run curl -fsSL "$key_url" | gpg --dearmor -o "$key_file"
@@ -1150,11 +1150,7 @@ get_supported_mongo_version() {
   mongo_version=(${mongo_version/./ })
   MONGO_VERSION_MAJOR=${mongo_version[0]}
   MONGO_VERSION_MINOR=${mongo_version[1]}
-  MONGO_VERSION_PATCH=${mongo_version[2]}
-  MONGO_VERSION_WITHOUT_PATCH="$MONGO_VERSION_MAJOR.$MONGO_VERSION_MINOR"
-  # these two aren't really used
-  MONGO_VERSION_WITH_PATCH="$MONGO_VERSION_MAJOR.$MONGO_VERSION_MINOR.$MONGO_VERSION_PATCH"
-  MONGO_VERSION=$MONGO_VERSION_WITH_PATCH
+  MONGO_VERSION="$MONGO_VERSION_MAJOR.$MONGO_VERSION_MINOR"
 }
 
 do_install_node() {
