@@ -214,7 +214,7 @@ get_os_distro() {
   if [ -r /etc/os-release ]; then
     distro="$(. /etc/os-release && echo "$ID")"
     distro_version="$(. /etc/os-release && echo "$VERSION_ID")"
-    distro_codename="$(. /etc/os-release && echo $VERSION_CODENAME)"
+    distro_codename="$(. /etc/os-release && echo ${VERSION_CODENAME:-})"
   fi
 }
 
