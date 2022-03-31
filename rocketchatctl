@@ -1142,6 +1142,9 @@ get_supported_node_version() {
 }
 
 get_supported_mongo_version() {
+  if [[ -n "$MONGO_VERSION" ]]; then
+    return
+  fi
   # jq query takes the latest supported mongo version
   local mongo_version=$(
     curl -s "$ROCKET_VERSION_INFO_URL" | jq -r '.compatibleMongoVersions | sort_by(.) | reverse | .[0] // empty'
