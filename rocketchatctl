@@ -907,7 +907,7 @@ do_update() {
 }
 
 check_node_major_version() {
-  major_version=${NODE_VERSION:1:2}
+  major_version=${NODE_VERSION%%.*} # Prefix up to the first dot
   [[ $(node -v) =~ ^v$major_version\.[0-9]+\.[0-9]+$ ]]
 }
 
