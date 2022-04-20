@@ -285,15 +285,6 @@ check_arguments_unattended_install() {
   while [ $# -gt 0 ]; do
     IFS='=' read -r -a args <<< $1
     case "${args[0]}" in
-      --dry-run)
-        printf "[WARNING] --dry-run is still experimental; some commands may still run; use with caution\n"
-        read -p "Do you want to continue? (Y|n) " con
-        [[ $con =~ ^y|Y$ ]] || { printf "Dry run aborted!"; exit 0; }
-        dry_run=1
-        run() {
-          echo "$@"
-        }
-        ;;
       --install-node)
         install_node_arg=1
         ;;
@@ -379,15 +370,15 @@ apt_configure_mongo() {
   local repo_url="deb [ arch=amd64 signed-by=$key_file ] https://repo.mongodb.org/apt/$distro $distro_codename/mongodb-org/$MONGO_VERSION_WITHOUT_PATCH ${repo[$distro]}"
 
 
-  run curl -fsSL "$key_url" | gpg --dearmor -o "$key_file"
+  curl -fsSL "$key_url" | gpg --dearmor -o "$key_file"
 
-  run echo $repo_url > $repo_file
+  echo $repo_url > $repo_file
 }
 
 yum_configure_mongo() {
   local yum_mongo_url="https://repo.mongodb.org/yum/redhat/$distro_version/mongodb-org/$MONGO_VERSION_WITHOUT_PATCH/x86_64/"
   local yum_key="https://www.mongodb.org/static/pgp/server-$MONGO_VERSION_WITHOUT_PATCH.asc"
-  run cat << EOF | tee -a /etc/yum.repos.d/mongodb-org-$MONGO_VERSION_WITHOUT_PATCH.repo
+  cat << EOF | tee -a /etc/yum.repos.d/mongodb-org-$MONGO_VERSION_WITHOUT_PATCH.repo
 [mongodb-org-$MONGO_VERSION_WITHOUT_PATCH]
 name=MongoDB Repository
 baseurl=$yum_mongo_url
@@ -398,36 +389,34 @@ EOF
 }
 
 apt_install_mongo() {
-  run apt-get update -qqq
+  apt-get update -qqq
   local pkg="mongodb-org"
   [[ -n $MONGO_VERSION ]] && pkg+="-$MONGO_VERSION" || true
-  run apt install $pkg -y
-  ((dry_run)) || {
-    printf "mongodb-org hold" | dpkg --set-selections
-    printf "mongodb-org-server hold" | dpkg --set-selections
-    printf "mongodb-org-shell hold" | dpkg --set-selections
-    printf "mongodb-org-mongos hold" | dpkg --set-selections
-    printf "mongodb-org-tools hold" | dpkg --set-selections
-  }
+  apt install $pkg -y
+  printf "mongodb-org hold" | dpkg --set-selections
+  printf "mongodb-org-server hold" | dpkg --set-selections
+  printf "mongodb-org-shell hold" | dpkg --set-selections
+  printf "mongodb-org-mongos hold" | dpkg --set-selections
+  printf "mongodb-org-tools hold" | dpkg --set-selections
 }
 
 yum_install_mongo() {
   local pkg="mongodb-org"
   [[ -n $MONGO_VERSION ]] && pkg+="-$MONGO_VERSION" || true
-  run yum install -y $pkg
+  yum install -y $pkg
 }
 
 configure_mongo() {
-  run sed -i "s/^#  engine:/  engine: wiredTiger/" /etc/mongod.conf
-  run sed -i "s/^#replication:/replication:\n  replSetName: rs01/" /etc/mongod.conf
+  sed -i "s/^#  engine:/  engine: wiredTiger/" /etc/mongod.conf
+  sed -i "s/^#replication:/replication:\n  replSetName: rs01/" /etc/mongod.conf
   if ! grep -Fq "  fork: true" /etc/mongod.conf; then
-    run sed -i "/^processManagement:/a\  fork: true" /etc/mongod.conf
+    sed -i "/^processManagement:/a\  fork: true" /etc/mongod.conf
   fi
 }
 
 create_mongo_systemd_file() {
-  run mkdir /etc/systemd/system/mongod.service.d/
-  run cat << EOF | tee -a /etc/systemd/system/mongod.service.d/mongod.conf
+  mkdir /etc/systemd/system/mongod.service.d/
+  cat << EOF | tee -a /etc/systemd/system/mongod.service.d/mongod.conf
 [Service]
 Type=oneshot
 RemainAfterExit=yes
@@ -435,29 +424,29 @@ EOF
 }
 
 initiate_and_start_mongo() {
-  run systemctl daemon-reload
-  run systemctl enable mongod
-  run systemctl start mongod
+  systemctl daemon-reload
+  systemctl enable mongod
+  systemctl start mongod
   if [[ -n $(pgrep mongod) ]]; then
-    run mongo --eval "printjson(rs.initiate())" >&2
+    mongo --eval "printjson(rs.initiate())" >&2
   fi
 }
 
 install_rocketchat() {
-  run curl -L $ROCKETCHAT_DOWNLOAD_URL -o /tmp/rocket.chat.tgz
-  run tar -xzf /tmp/rocket.chat.tgz -C /tmp
-  run cd /tmp/bundle/programs/server && npm install
+  curl -L $ROCKETCHAT_DOWNLOAD_URL -o /tmp/rocket.chat.tgz
+  tar -xzf /tmp/rocket.chat.tgz -C /tmp
+  cd /tmp/bundle/programs/server && npm install
   # add npm install node-gyp@5.0.1 to fix 4 moderate severity vulnerabilities
-  run mv /tmp/bundle $ROCKETCHAT_DIR
-  run rm /tmp/rocket.chat.tgz
+  mv /tmp/bundle $ROCKETCHAT_DIR
+  rm /tmp/rocket.chat.tgz
 }
 
 set_rocketchat_user_and_permissions() {
   id -un rocketchat 1> /dev/null 2>&1
   if [ $? -ne 0 ]; then
-    run useradd -M rocketchat && usermod -L rocketchat
+    useradd -M rocketchat && usermod -L rocketchat
   fi
-  run chown -R rocketchat:rocketchat $ROCKETCHAT_DIR
+  chown -R rocketchat:rocketchat $ROCKETCHAT_DIR
 }
 
 create_rocketchat_systemd_file() {
@@ -467,7 +456,7 @@ create_rocketchat_systemd_file() {
   if [[ $webserver != "none" ]] && $bind_loopback; then
     BIND_IP="127.0.0.1"
   fi
-  run cat << EOF | tee -a /lib/systemd/system/rocketchat.service
+  cat << EOF | tee -a /lib/systemd/system/rocketchat.service
 [Unit]
 Description=The Rocket.Chat server
 After=network.target remote-fs.target nss-lookup.target mongod.service
@@ -490,14 +479,14 @@ EOF
 }
 
 start_rocketchat() {
-  run systemctl daemon-reload
-  run systemctl enable rocketchat
-  run systemctl start rocketchat
+  systemctl daemon-reload
+  systemctl enable rocketchat
+  systemctl start rocketchat
 }
 
 restart_rocketchat() {
-  run systemctl daemon-reload
-  run  systemctl restart rocketchat
+  systemctl daemon-reload
+  systemctl restart rocketchat
 }
 
 get_rocketchat_domain() {
@@ -511,12 +500,12 @@ get_mongo_storage_engine() {
 traefik_config_file() {
   if [ -f /etc/traefik/traefik.toml ]; then
     sufix=$(date +%s)
-    run  cp /etc/traefik/traefik.toml /etc/traefik/traefik.toml.$sufix
+    cp /etc/traefik/traefik.toml /etc/traefik/traefik.toml.$sufix
     if [ $? == 0 ]; then
       true > /etc/traefik/traefik.toml
     fi
   fi
-  run cat << EOF | tee -a /etc/traefik/traefik.toml
+  cat << EOF | tee -a /etc/traefik/traefik.toml
 defaultEntryPoints = ["https","http"]
 
 [entryPoints]
@@ -556,7 +545,7 @@ EOF
 }
 
 traefik_systemd_file() {
-  run cat << EOF | tee -a /lib/systemd/system/traefik.service
+  cat << EOF | tee -a /lib/systemd/system/traefik.service
 [Unit]
 Description=Traefik
 Documentation=https://docs.traefik.io
@@ -604,45 +593,45 @@ EOF
 }
 
 install_traefik() {
-  run curl -L $TRAEFIK_DOWNLOAD_URL -o /tmp/traefik
+  curl -L $TRAEFIK_DOWNLOAD_URL -o /tmp/traefik
   if [[ $? == 0 ]]; then
-    run mv /tmp/traefik /usr/local/bin/
+    mv /tmp/traefik /usr/local/bin/
   else
     print_download_traefik_error_and_exit
   fi
-  run useradd -r -s /bin/false -U -M traefik
-  run chown root:root /usr/local/bin/traefik
-  run chmod 755 /usr/local/bin/traefik
-  run setcap 'cap_net_bind_service=+ep' /usr/local/bin/traefik
-  run mkdir /etc/traefik
-  run mkdir /etc/traefik/acme
-  run touch /etc/traefik/acme/acme.json
-  run chown -R root:root /etc/traefik
-  run chown -R traefik:traefik /etc/traefik/acme
-  run chmod 600 /etc/traefik/acme/acme.json
+  useradd -r -s /bin/false -U -M traefik
+  chown root:root /usr/local/bin/traefik
+  chmod 755 /usr/local/bin/traefik
+  setcap 'cap_net_bind_service=+ep' /usr/local/bin/traefik
+  mkdir /etc/traefik
+  mkdir /etc/traefik/acme
+  touch /etc/traefik/acme/acme.json
+  chown -R root:root /etc/traefik
+  chown -R traefik:traefik /etc/traefik/acme
+  chmod 600 /etc/traefik/acme/acme.json
 
   get_rocketchat_domain
   traefik_config_file
-  run chown root:root /etc/traefik/traefik.toml
-  run chmod 644 /etc/traefik/traefik.toml
+  chown root:root /etc/traefik/traefik.toml
+  chmod 644 /etc/traefik/traefik.toml
 
   traefik_systemd_file
-  run chown root:root /lib/systemd/system/traefik.service
-  run chmod 644 /lib/systemd/system/traefik.service
-  run systemctl daemon-reload
-  run systemctl enable traefik.service
-  run systemctl start traefik.service
+  chown root:root /lib/systemd/system/traefik.service
+  chmod 644 /lib/systemd/system/traefik.service
+  systemctl daemon-reload
+  systemctl enable traefik.service
+  systemctl start traefik.service
 }
 
 caddy_config_file() {
   if [ -f /etc/caddy/Caddyfile ]; then
     sufix=$(date +%s)
-    run cp /etc/caddy/Caddyfile /etc/caddy/Caddyfile.$sufix
+    cp /etc/caddy/Caddyfile /etc/caddy/Caddyfile.$sufix
     if [ $? == 0 ]; then
       true > /etc/caddy/Caddyfile
     fi
   fi
-  run cat << EOF | tee -a /etc/caddy/Caddyfile
+  cat << EOF | tee -a /etc/caddy/Caddyfile
 $ROOT_URL
 proxy / localhost:$PORT {
   websocket
@@ -654,12 +643,12 @@ EOF
 caddy_systemd_file() {
   if [ -f /lib/systemd/system/caddy.service ]; then
     sufix=$(date +%s)
-    run cp /lib/systemd/system/caddy.service /etc/caddy/caddy.service.$sufix
+    cp /lib/systemd/system/caddy.service /etc/caddy/caddy.service.$sufix
     if [ $? == 0 ]; then
       true > /lib/systemd/system/caddy.service
     fi
   fi
-  run cat << EOF | tee -a /lib/systemd/system/caddy.service
+  cat << EOF | tee -a /lib/systemd/system/caddy.service
 [Unit]
 Description=Caddy HTTP/2 web server
 Documentation=https://caddyserver.com/docs
@@ -715,29 +704,29 @@ EOF
 }
 
 install_caddy() {
-  run curl -L $CADDY_DOWNLOAD_URL -o /tmp/caddy.tar.gz
-  run tar -xzf /tmp/caddy.tar.gz -C /tmp
-  run mv /tmp/caddy /usr/local/bin
-  run rm /tmp/caddy.tar.gz
-  run chown root:root /usr/local/bin/caddy
-  run chmod 755 /usr/local/bin/caddy
-  run setcap cap_net_bind_service=+ep $(which caddy)
-  run mkdir /etc/caddy
-  run mkdir /etc/caddy/ssl
-  run chown -R root:root /etc/caddy
-  run useradd -r -s /bin/false -U -M caddy
-  run chown -R caddy:caddy /etc/caddy/ssl
+  curl -L $CADDY_DOWNLOAD_URL -o /tmp/caddy.tar.gz
+  tar -xzf /tmp/caddy.tar.gz -C /tmp
+  mv /tmp/caddy /usr/local/bin
+  rm /tmp/caddy.tar.gz
+  chown root:root /usr/local/bin/caddy
+  chmod 755 /usr/local/bin/caddy
+  setcap cap_net_bind_service=+ep $(which caddy)
+  mkdir /etc/caddy
+  mkdir /etc/caddy/ssl
+  chown -R root:root /etc/caddy
+  useradd -r -s /bin/false -U -M caddy
+  chown -R caddy:caddy /etc/caddy/ssl
 
   caddy_config_file
-  run chown root:root /etc/caddy/Caddyfile
-  run chmod 644 /etc/caddy/Caddyfile
+  chown root:root /etc/caddy/Caddyfile
+  chmod 644 /etc/caddy/Caddyfile
 
   caddy_systemd_file
-  run chown root:root /lib/systemd/system/caddy.service
-  run chmod 644 /lib/systemd/system/caddy.service
-  run systemctl daemon-reload
-  run systemctl enable caddy.service
-  run systemctl start caddy.service
+  chown root:root /lib/systemd/system/caddy.service
+  chmod 644 /lib/systemd/system/caddy.service
+  systemctl daemon-reload
+  systemctl enable caddy.service
+  systemctl start caddy.service
 }
 
 get_rocketchat_latest_version() {
@@ -783,10 +772,10 @@ do_setup() {
           apt install curl jq build-essential graphicsmagick -yqqq
       ;;
     centos)
-        run yum -y check-update || true
-        run yum install gcc-c++ make curl -y
-        run yum install -y epel-release
-        run yum install GraphicsMagick jq -y
+        yum -y check-update || true
+        yum install gcc-c++ make curl -y
+        yum install -y epel-release
+        yum install GraphicsMagick jq -y
       ;;
   esac
 
@@ -896,20 +885,20 @@ do_check_updates() {
 
 do_update() {
   do_update_node
-  run mv $ROCKETCHAT_DIR $ROCKETCHAT_DIR_UPDATE
+  mv $ROCKETCHAT_DIR $ROCKETCHAT_DIR_UPDATE
   if [ $? == 0 ]; then
-    run systemctl stop rocketchat
+    systemctl stop rocketchat
     install_rocketchat
     set_rocketchat_user_and_permissions
-    run systemctl start rocketchat
+    systemctl start rocketchat
     rocketchat_health_check
     if [ $rocket_healthy -eq 1 ]; then
       run rm -rf $ROCKETCHAT_DIR_UPDATE
       echo "RocketChat server updated to latest version :)"
       exit 0
     else
-      run rm -rf $ROCKETCHAT_DIR && mv $ROCKETCHAT_DIR_UPDATE $ROCKETCHAT_DIR
-      run systemctl restart rocketchat
+      rm -rf $ROCKETCHAT_DIR && mv $ROCKETCHAT_DIR_UPDATE $ROCKETCHAT_DIR
+      systemctl restart rocketchat
       print_update_install_failed_exit
     fi
   else
@@ -927,22 +916,22 @@ do_update_node() {
   local currently_used_node_path=$(awk -F'[= ]' '$1 == "ExecStart" {print $2}' /lib/systemd/system/rocketchat.service)
   [[ $($currently_used_node_path --version 2> /dev/null) == "$NODE_VERSION" ]] && return
   do_install_node
-  run sed -Ei "s@^(ExecStart)=$currently_used_node_path {1,}(.+)\$@\1=$NODE_BIN \2@" /lib/systemd/system/rocketchat.service
+  sed -Ei "s@^(ExecStart)=$currently_used_node_path {1,}(.+)\$@\1=$NODE_BIN \2@" /lib/systemd/system/rocketchat.service
   check_node_major_version || print_node_not_updated_error_and_exit
 }
 
 do_upgrade_rocketchatctl() {
-  run curl -L $ROCKETCHATCTL_DOWNLOAD_URL -o /tmp/rocketchatctl
+  curl -L $ROCKETCHATCTL_DOWNLOAD_URL -o /tmp/rocketchatctl
   if [ $? != 0 ]; then
     print_upgrade_download_rocketchatctl_error_and_exit
   fi
   if cmp -s $ROCKETCHATCTL_DIRECTORY/rocketchatctl /tmp/rocketchatctl; then
-    run rm /tmp/rocketchatctl
+   rm /tmp/rocketchatctl
     echo "rocketchatctl already in latest version."
     exit 0
   else
-    run mv /tmp/rocketchatctl $ROCKETCHATCTL_DIRECTORY/
-    run chmod 755 $ROCKETCHATCTL_DIRECTORY/rocketchatctl
+    mv /tmp/rocketchatctl $ROCKETCHATCTL_DIRECTORY/
+    chmod 755 $ROCKETCHATCTL_DIRECTORY/rocketchatctl
     echo "rocketchatctl upgraded to latest version."
     exit 0
   fi
@@ -1034,11 +1023,11 @@ check_arguments_configure() {
 
 update_rocketchat_systemd_file() {
   ROOT_URL_REPLACED=$(echo ${ROOT_URL//\//\\/})
-  run sed -i "/^Environment=ROOT_URL=/c\Environment=ROOT_URL=$ROOT_URL_REPLACED" /lib/systemd/system/rocketchat.service
-  run sed -i "/^Environment=PORT=/c\Environment=PORT=$PORT" /lib/systemd/system/rocketchat.service
+  sed -i "/^Environment=ROOT_URL=/c\Environment=ROOT_URL=$ROOT_URL_REPLACED" /lib/systemd/system/rocketchat.service
+  sed -i "/^Environment=PORT=/c\Environment=PORT=$PORT" /lib/systemd/system/rocketchat.service
   if [ "${bind_loopback_arg}" -eq 1 ] || [ "${configure_webserver}" -eq 1 ]; then
     [[ $bind_loopback == true ]] && BIND_IP=127.0.0.1 || BIND_IP=0.0.0.0
-    run sed -i "/^Environment=BIND_IP=/c\Environment=BIND_IP=$BIND_IP" /lib/systemd/system/rocketchat.service
+    sed -i "/^Environment=BIND_IP=/c\Environment=BIND_IP=$BIND_IP" /lib/systemd/system/rocketchat.service
   fi
 }
 
@@ -1076,13 +1065,13 @@ do_configure() {
       traefik)
         get_rocketchat_domain
         traefik_config_file
-        run systemctl restart traefik.service
+        systemctl restart traefik.service
         ;;
       caddy)
         caddy_config_file
         caddy_systemd_file
-        run systemctl daemon-reload
-        run systemctl restart caddy.service
+        systemctl daemon-reload
+        systemctl restart caddy.service
         ;;
       *)
         print_no_webserver_installed_and_exit
@@ -1114,15 +1103,15 @@ check_arguments_backup() {
 }
 
 check_bkup_dir() {
-  run touch "$backup_dir/testfile_$sufix.txt" /dev/null 2>&1 && run rm "$backup_dir/testfile_$sufix.txt" || print_backup_dir_error_and_exit
+  touch "$backup_dir/testfile_$sufix.txt" /dev/null 2>&1 && run rm "$backup_dir/testfile_$sufix.txt" || print_backup_dir_error_and_exit
 }
 
 do_backup() {
   check_bkup_dir
-  run systemctl stop rocketchat
+  systemctl stop rocketchat
 
-  if run mongodump --host localhost:27017 --db rocketchat --archive --gzip  > "$backup_dir/dump_$sufix.gz"; then
-    run systemctl start rocketchat
+  if mongodump --host localhost:27017 --db rocketchat --archive --gzip  > "$backup_dir/dump_$sufix.gz"; then
+    systemctl start rocketchat
     [[ -s $backup_dir/dump_$sufix.gz ]] && print_backup_ok || print_backup_error_and_exit
   else
     print_empty_backup_error_and_exit
@@ -1133,8 +1122,8 @@ do_install_nvm() {
   # if n not found, install nvm to manage node versions
   mkdir /opt/nvm
   local nvm_version=$(curl -s https://api.github.com/repos/nvm-sh/nvm/releases/latest | jq .tag_name -r)
-  run curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/$nvm_version/install.sh | NVM_DIR=/opt/nvm bash
-  run source /opt/nvm/nvm.sh # ensure nvm and other node commands are available for the current session
+  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/$nvm_version/install.sh | NVM_DIR=/opt/nvm bash
+  source /opt/nvm/nvm.sh # ensure nvm and other node commands are available for the current session
 }
 
 get_supported_node_version() {
@@ -1180,17 +1169,13 @@ do_install_node() {
 
   if command_exists n; then
     # since previously this script used n
-    run n $NODE_VERSION
+    n $NODE_VERSION
     NODE_BIN=$(n which $NODE_VERSION)
   else
     command_exists nvm || { test -s /opt/nvm/nvm.sh && run source $_ || do_install_nvm; }
-    run nvm i $NODE_VERSION
+    nvm i $NODE_VERSION
     NODE_BIN=$(nvm which $NODE_VERSION)
   fi
-}
-
-run() {
-  "$@"
 }
 
 main() {
