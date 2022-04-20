@@ -370,13 +370,13 @@ check_arguments_unattended_install() {
 }
 
 apt_configure_mongo() {
-  local key_url="https://www.mongodb.org/static/pgp/server-$MONGO_VERSION.asc"
-  local key_file="/usr/share/keyrings/mongodb-org-$MONGO_VERSION.gpg"
-  local repo_file="/etc/apt/sources.list.d/mongodb-org-$MONGO_VERSION.list"
+  local key_url="https://www.mongodb.org/static/pgp/server-$MONGO_VERSION_WITHOUT_PATCH.asc"
+  local key_file="/usr/share/keyrings/mongodb-org-$MONGO_VERSION_WITHOUT_PATCH.gpg"
+  local repo_file="/etc/apt/sources.list.d/mongodb-org-$MONGO_VERSION_WITHOUT_PATCH.list"
 
   declare -A repo=([ubuntu]=multiverse [debian]=main)
 
-  local repo_url="deb [ arch=amd64 signed-by=$key_file ] https://repo.mongodb.org/apt/$distro $distro_codename/mongodb-org/$MONGO_VERSION ${repo[$distro]}"
+  local repo_url="deb [ arch=amd64 signed-by=$key_file ] https://repo.mongodb.org/apt/$distro $distro_codename/mongodb-org/$MONGO_VERSION_WITHOUT_PATCH ${repo[$distro]}"
 
 
   run curl -fsSL "$key_url" | gpg --dearmor -o "$key_file"
@@ -399,7 +399,7 @@ EOF
 
 apt_install_mongo() {
   run apt-get update -qqq
-  run apt install mongodb-org -y
+  [[ -n $MONGO_VERSION ]] && run apt install mongodb-org=$MONGO_VERSION -y || run apt install mongodb-org -y
   ((dry_run)) || {
     printf "mongodb-org hold" | dpkg --set-selections
     printf "mongodb-org-server hold" | dpkg --set-selections
@@ -1142,6 +1142,12 @@ get_supported_node_version() {
 }
 
 get_supported_mongo_version() {
+  # if mongo_version was passed to the cli
+  if [[ -n $MONGO_VERSION ]]; then
+    local mongo_version=(${MONGO_VERSION/./ })
+    MONGO_VERSION_WITHOUT_PATCH="${mongo_version[0]}.${mongo_version[1]}"
+    return
+  fi
   # jq query takes the latest supported mongo version
   local mongo_version=$(
     curl -s "$ROCKET_VERSION_INFO_URL" | jq -r '.compatibleMongoVersions | sort_by(.) | reverse | .[0] // empty'
@@ -1153,7 +1159,7 @@ get_supported_mongo_version() {
   mongo_version=(${mongo_version/./ })
   MONGO_VERSION_MAJOR=${mongo_version[0]}
   MONGO_VERSION_MINOR=${mongo_version[1]}
-  MONGO_VERSION="$MONGO_VERSION_MAJOR.$MONGO_VERSION_MINOR"
+  MONGO_VERSION_WITHOUT_PATCH="$MONGO_VERSION_MAJOR.$MONGO_VERSION_MINOR"
 }
 
 do_install_node() {
