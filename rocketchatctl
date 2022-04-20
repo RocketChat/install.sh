@@ -783,11 +783,10 @@ do_setup() {
           apt install curl jq build-essential graphicsmagick -yqqq
       ;;
     centos)
-        run yum -y check-update && {
-          run yum install gcc-c++ make jq curl -y
-          run yum install -y epel-release
-          run yum install GraphicsMagick -y
-        }
+        run yum -y check-update || true
+        run yum install gcc-c++ make curl -y
+        run yum install -y epel-release
+        run yum install GraphicsMagick jq -y
       ;;
   esac
 
