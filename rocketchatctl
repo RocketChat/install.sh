@@ -225,7 +225,7 @@ os_supported() {
       [[ "$distro_version" =~ (("18.04"|"19.04"|"19.10"|"20.04"|"21.04"|"21.10")) ]] || print_distro_not_supported_error_and_exit
       ;;
     debian)
-      [[ "$distro_version" =~ (("9"|"10")) ]] || print_distro_not_supported_error_and_exit
+      [[ "$distro_version" =~ (("9"|"10"|"11")) ]] || print_distro_not_supported_error_and_exit
       ;;
     centos)
       [[ "$distro_version" =~ (("7"|"8")) ]] || print_distro_not_supported_error_and_exit
