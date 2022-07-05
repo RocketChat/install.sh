@@ -41,7 +41,6 @@ check_centos() {
 verify_host() {
   init_os_details
   declare -A host_check=([ubuntu]=check_ubuntu [centos]=check_centos [debian]=check_debian)
-  local func=${host_check[$DISTRO]:-__no_func}
-  [[ $func == "__no_func" ]] && print_distro_not_supported_error_and_exit $DISTRO
-  eval $func
+  [[ -v "host_check[$DISTRO]" ]] || print_distro_not_supported_error_and_exit $DISTRO
+  eval "${host_check[$DISTRO]}"
 }
