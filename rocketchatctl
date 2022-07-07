@@ -893,7 +893,7 @@ do_update() {
     systemctl start rocketchat
     rocketchat_health_check
     if [ $rocket_healthy -eq 1 ]; then
-      run rm -rf $ROCKETCHAT_DIR_UPDATE
+      rm -rf $ROCKETCHAT_DIR_UPDATE
       echo "RocketChat server updated to latest version :)"
       exit 0
     else
@@ -1103,7 +1103,7 @@ check_arguments_backup() {
 }
 
 check_bkup_dir() {
-  touch "$backup_dir/testfile_$sufix.txt" /dev/null 2>&1 && run rm "$backup_dir/testfile_$sufix.txt" || print_backup_dir_error_and_exit
+  touch "$backup_dir/testfile_$sufix.txt" /dev/null 2>&1 && rm "$backup_dir/testfile_$sufix.txt" || print_backup_dir_error_and_exit
 }
 
 do_backup() {
@@ -1172,7 +1172,7 @@ do_install_node() {
     n $NODE_VERSION
     NODE_BIN=$(n which $NODE_VERSION)
   else
-    command_exists nvm || { test -s /opt/nvm/nvm.sh && run source $_ || do_install_nvm; }
+    command_exists nvm || { test -s /opt/nvm/nvm.sh && source $_ || do_install_nvm; }
     nvm i $NODE_VERSION
     NODE_BIN=$(nvm which $NODE_VERSION)
   fi
