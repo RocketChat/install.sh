@@ -5,26 +5,26 @@ source "../b-log/b-log.sh"
 source "./node.bash"
 source "./mongodb.bash"
 
+ROOT_URL=
+PORT=
+WEBSERVER=
+LETSENCRYPT_EMAIL=
+VERSION=
+INSTALL_MONGO=
+USE_MONGO=
+MONGO_VERSION=
+BIND_LOOPBACK=
+REG_TOKEN=
+INSTALL_NODE=
+N=
+NVM=
+M=
+
+NODE_VERSION_REQUIRED=
+NODE_PATH=
+MONGODB_SUPPORTED_VERSIONS=()
 
 run_install() {
-  local ROOT_URL=
-  local PORT=
-  local WEBSERVER=
-  local LETSENCRYPT_EMAIL=
-  local VERSION=
-  local INSTALL_MONGO=
-  local USE_MONGO=
-  local MONGO_VERSION=
-  local BIND_LOOPBACK=
-  local REG_TOKEN=
-  local INSTALL_NODE=
-  local N=
-  local NVM=
-  local M=
-
-  local NODE_VERSION_REQUIRED=
-  local NODE_PATH=
-  local MONGODB_SUPPORTED_VERSIONS=()
   while [[ -n "$1" ]]; do
     case "$1" in
       --root-url)
@@ -107,7 +107,7 @@ run_install() {
 
   if command_exists "mongod"; then
 
-    INFO "detecting mongodb server already installed"
+    INFO "detecting existing mongodb installation"
 
     mongo --quiet --eval 'db.adminCommand({ ping: 1 }).ok' | grep -q 1 ||
       ERROR "failed to connect to mongodb; required to check configuration" \

@@ -1,4 +1,3 @@
-
 _append_to_shellrc() {
   local new_path="${1?path required}"
   case "$(basename $SHELL)" in
