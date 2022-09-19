@@ -2,6 +2,42 @@
 
 source "../b-log/b-log.sh"
 
+show_long_help() {
+  cat << EOM
+rocketchatctl command line tool to install and update RocketChat server
+Usage: $(basename "$0") [options] [--root-url=ROOT_URL --port=PORT --letsencrypt-email=EMAIL --webserver=WEBSERVER  --version=VERSION --install-node --use-mongo]
+Installs node, mongo, RocketChat server and optionally a webserver (Caddy or Traefik), sets up directories and permissions to use Let's Encrypt certificates.
+In case node or mongo already installed, it uses already installed versions though confirmation is required.
+For node it set $NODE_VERSION as default in your system, for mongo wiredTiger storage engine and no authentication enabled is required during installation.
+If you wish this script to run unattended, provide extra flags to the install option, server URL is required (--root-url).
+OPTIONS
+  -h help                   Display this message
+  install                   Install latest RocketChat server version
+  update                    Update RocketChat server from current version to latest version
+  check-updates             Check for updates of RocketChat server
+  upgrade-rocketchatctl     Upgrade the rocketchatctl command line tool
+  configure                 Configures RocketChat server and Let's Encrypt
+  backup                    Makes a rocketchat database backup
+FOR UNATTENDED INSTALLATION
+  --root-url=ROOT_URL       the public URL where RocketChat server will be accessible on the Internet (REQUIRED)
+  --port=PORT               port for the RocketChat server, default value 3000
+  --webserver=WEBSERVER     webserver to install as reverse proxy for RocketChat server, options are caddy/traefik/none (REQUIRED)
+  --letsencrypt-email=EMAIL e-mail address to use for SSL certificates (REQUIRED if webserver is not none)
+  --version=VERSION         RocketChat server version to install, default latest
+  --install-node            in case node installed, sets node to RocketChat server recommended version, default behavoir cancel RocketChat server installation
+  --use-mongo               in case mongo installed, and storage engine configured is wiredTiger, skip mongo installation but uses systems mongo for RocketChat server database,
+                            default database name rocketchat
+  --mongo-version=4.x.x     mongo 4 version, default value is latest (supported only for Debian and Ubuntu)
+  --bind-loopback=value     value=(true|false) set to false to prevent from bind RocketChat server to loopback interface when installing a webserver (default true)
+  --reg-token=TOKEN         This value can be obtained from https://cloud.rocket.chat to automatically register your workspace during startup
+FOR CONFIGURE OPTION
+  --rocketchat --root-url=ROOT_URL --port=PORT --bind-loopback=value                  Reconfigures RocketChat server Site-URL and port (--root-url REQUIRED)
+  --lets-encrypt --root-url=ROOT_URL --letsencrypt-email=EMAIL --bind-loopback=value  Reconfigures webserver with Let's Encrypt and RocketChat server Site-URL (--root-url and letsencrypt-email REQUIRED)
+FOR BACKUP OPTION
+  --backup-dir=<path_to_dir>       sets the directory for storing the backup files, default backup directory is /tmp
+EOM
+}
+
 show_short_help() {
   NOTICE "Run '$(basename "$0") -h' to see the full list of available options."
 }
@@ -168,4 +204,19 @@ print_no_release_information_file_found_error() {
 
 print_done() {
   INFO "Done :)"
+}
+
+print_is_utility_use() {
+  INFO "Usage: is <key> in <array>"
+}
+
+print_wrong_is_utility_usage() {
+  ERROR "incorrect use of \"is\"; unknown key ${1}"
+  print
+}
+
+print_unknown_command_argument() {
+  ERROR "unknown argument ${0}"
+  show_long_help
+  exit 1
 }

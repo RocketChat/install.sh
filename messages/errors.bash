@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 
-# FIXME: use use locale
+# FIXME: use locale
 source "./en.sh"

@@ -2,9 +2,10 @@
 
 source "../b-log/b-log.sh"
 source "../errors/errors.bash"
+source "./lib.bash"
 
-# @private
-init_os_details() {
+# functions like an init() {} function
+{
   [[ -r /etc/os-release ]] || print_no_release_information_file_found_error
 
   source /etc/os-release
@@ -38,9 +39,13 @@ check_centos() {
 }
 
 # @public
-verify_host() {
+is_host_supported() {
   init_os_details
-  declare -A host_check=([ubuntu]=check_ubuntu [centos]=check_centos [debian]=check_debian)
-  [[ -v "host_check[$DISTRO]" ]] || print_distro_not_supported_error_and_exit $DISTRO
+  declare -A host_check=(
+    [ubuntu]=check_ubuntu 
+    [centos]=check_centos 
+    [debian]=check_debian
+  )
+  is $DISTRO in host_check || print_distro_not_supported_error_and_exit $DISTRO
   eval "${host_check[$DISTRO]}"
 }
