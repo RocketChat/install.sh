@@ -4,7 +4,6 @@ source "../b-log/b-log.sh"
 source "../errors/errors.bash"
 source "./lib.bash"
 
-# functions like an init() {} function
 {
   [[ -r /etc/os-release ]] || print_no_release_information_file_found_error
 
@@ -49,3 +48,23 @@ is_host_supported() {
   is $DISTRO in host_check || print_distro_not_supported_error_and_exit $DISTRO
   eval "${host_check[$DISTRO]}"
 }
+
+init_host() {
+  local cmd=
+  case "$DISTRO" in
+    debian | ubuntu)
+      cmd="apt install -y"
+      ;;
+    centos)
+      local _cmd=
+      command_exists "dnf" && _cmd="dnf" || _cmd="yum"
+      cmd="$_cmd install -y"
+      ;;
+  esac
+  install_pkg() {
+    "$cmd" "$@"
+  }
+}
+
+# placeholder for lsp
+install_pkg() {}

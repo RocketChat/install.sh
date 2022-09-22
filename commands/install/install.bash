@@ -5,6 +5,7 @@ source "../b-log/b-log.sh"
 source "./node.bash"
 source "./mongodb.bash"
 
+# All following functions are going to reuse these variables
 ROOT_URL=
 PORT=
 WEBSERVER=
@@ -22,7 +23,6 @@ M=
 
 NODE_VERSION_REQUIRED=
 NODE_PATH=
-MONGODB_SUPPORTED_VERSIONS=()
 
 run_install() {
   while [[ -n "$1" ]]; do
@@ -65,6 +65,10 @@ run_install() {
         MONGO_VERSION="${mongod_version[0]}:${mongod_version[1]}"
         shift 2
         ;;
+      --use-m)
+        M=1
+        shift
+        ;;
       --bind-loopback)
         # TODO: default set this to true if webserver != none
         BIND_LOOPBACK=1
@@ -101,7 +105,7 @@ run_install() {
 
   NODE_VERSION_REQUIRED="$(jq -r .nodeVersion <<< $release_info_json)"
 
-  install_node $NODE_VERSION_REQUIRED
+  install_node
 
   local mongodb_supported_versions_json="$(jq -r .compatibleMongoVersions <<< $release_info_json)"
 
@@ -134,7 +138,7 @@ run_install() {
         " either pass a supported version from ($(jq '. | join(\', \') <<< $mongodb_supported_versions_json)) or" \
         " don't mention a mongodb version"
   else
-    install_mongodb $MONGO_VERSION
+    install_mongodb
   fi
 
 

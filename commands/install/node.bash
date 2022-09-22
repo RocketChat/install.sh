@@ -55,7 +55,7 @@ _nvm() {
   _nvm_install_node
 }
 
-_manual() {
+_manual_install_node() {
   local archive_file_name="node-$NODE_VERSION_REQUIRED-linux-x64"
   local url="https://nodejs.org/dist/$NODE_VERSION_REQUIRED/$archive_file_name.tar.xz"
   INFO "downloading node $NODE_VERSION_REQUIRED installation archive"
@@ -97,6 +97,6 @@ install_node() {
   fi
 
   # default
-  _manual
+  _manual_install_node
 }
 

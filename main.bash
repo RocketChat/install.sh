@@ -23,4 +23,13 @@ handle_arguments() {
 
 }
 
-main() {}
+# TODO add --dry-run option
+
+main() {
+  (($(id -u))) && ERROR "you must use a non root account to run this script"
+
+  is_host_supported
+
+  init_host
+
+}
