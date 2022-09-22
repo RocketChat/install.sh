@@ -6,6 +6,7 @@
 # TODO change this
 source "./messages/en.bash"
 source "./commands/install/install.bash"
+source "./helpers/host.bash"
 
 handle_arguments() {
   case "$1" in
@@ -31,3 +32,5 @@ main() {
   init_host
 
 }
+
+main
