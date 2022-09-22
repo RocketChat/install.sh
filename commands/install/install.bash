@@ -2,8 +2,8 @@
 
 source "./messages/en.bash"
 source "./b-log/b-log.sh"
-source "./node.bash"
-source "./mongodb.bash"
+source "./commands/install/node.bash"
+source "./commands/install/mongodb.bash"
 
 # All following functions are going to reuse these variables
 ROOT_URL=
