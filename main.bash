@@ -5,9 +5,7 @@
 
 # TODO change this
 source "./messages/en.bash"
-source "./commands/install.bash"
-source "./commands/check_updates.bash"
-source "./commands/update.bash"
+source "./commands/install/install.bash"
 
 handle_arguments() {
   case "$1" in
