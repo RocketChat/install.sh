@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source "../../b-log/b-log.sh"
+source "./b-log/b-log.sh"
 
 M_BIN_URL="https://raw.githubusercontent.com/aheckmann/m/master/bin/m"
 

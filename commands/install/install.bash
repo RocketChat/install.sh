@@ -1,7 +1,7 @@
 #!/bin/bash
 
-source "../messages/en.bash"
-source "../b-log/b-log.sh"
+source "./messages/en.bash"
+source "./b-log/b-log.sh"
 source "./node.bash"
 source "./mongodb.bash"
 
