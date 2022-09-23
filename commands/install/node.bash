@@ -1,5 +1,7 @@
 #!/bin/bash
 
+_source "helpers/lib.bash"
+
 _append_to_shellrc() {
   local new_path="${1?path required}"
   case "$(basename "$SHELL")" in
@@ -49,7 +51,7 @@ _nvm_install_node() {
     FATAL "failed to install node $NODE_VERSION_REQUIRED using nvm"
     exit 2
   fi
-  NODE_PATH="$(nvm which "$NODE_VERSION_REQUIRED")" || ERROR "failed to capture installed node binary path"
+  funcreturn "$(nvm which "$NODE_VERSION_REQUIRED")" || ERROR "failed to capture installed node binary path"
 }
 
 _n_install_node() {
@@ -57,7 +59,7 @@ _n_install_node() {
     FATAL "failed to install $NODE_VERSION_REQUIRED using n"
     exit 1
   fi
-  NODE_PATH="$(nvm which "$NODE_VERSION_REQUIRED")" || ERROR "failed to capture installed node binary path"
+  funcreturn "$(nvm which "$NODE_VERSION_REQUIRED")" || ERROR "failed to capture installed node binary path"
 }
 
 _n() {
@@ -93,10 +95,12 @@ _manual_install_node() {
   _append_to_shellrc "$new_path"
   export PATH="$new_path:$PATH"
 
-  NODE_PATH="${archive_file_name}/bin/node"
+  funcreturn "${archive_file_name}/bin/node"
 }
 
 install_node() {
+  local node_verison="${1?nodejs version string required}"
+
   local node_exists
   command_exists "node" && node_exists=1 || node_exists=0
 
@@ -104,7 +108,7 @@ install_node() {
     print_node_version_error_and_exit
   fi
 
-  if ((node_exists)) && node -e "process.exit(process.version === 'v${NODE_VERSION_REQUIRED}' ? 0 : 1)"; then
+  if ((node_exists)) && node -e "process.exit(process.version === 'v${node_verison}' ? 0 : 1)"; then
     SUCCESS "node version satisfied"
     return
   fi

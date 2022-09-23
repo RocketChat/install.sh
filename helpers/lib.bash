@@ -14,9 +14,13 @@ is() {
 }
 
 command_exists() {
-  command -v "$1" &>/dev/null
+  command -v "$1" &> /dev/null
 }
 
 am_i_root() {
   [[ $(id -u) -eq 0 ]]
+}
+
+funcreturn() {
+  echo "$@"
 }

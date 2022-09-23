@@ -4,6 +4,8 @@ _source "messages/en.bash"
 _source "b-log/b-log.sh"
 _source "commands/install/node.bash"
 _source "commands/install/mongodb.bash"
+_source "helpers/rocketchat.bash"
+_source "helpers/mongodb.bash"
 
 # All following functions are going to reuse these variables
 ROOT_URL=
@@ -22,6 +24,9 @@ M=
 
 NODE_VERSION_REQUIRED=
 NODE_PATH=
+
+RELEASE_INFO_ENDPOINT=
+RELEASE_INFO_JSON=
 
 run_install() {
   while [[ -n "$1" ]]; do
@@ -115,31 +120,16 @@ run_install() {
     esac
   done
 
-  # background checks
-  local info_endpoint=
-  info_endpoint="https://releases.rocket.chat/${RELEASE:=latest}/info"
-  DEBUG "info_endpoint: $info_endpoint"
-  local release_info_json=
-  if ! release_info_json="$(curl --silent "$info_endpoint")"; then
-    FATAL "could not gather release information"
-    exit 2
-  fi
-  DEBUG "release_info_json: $release_info_json"
-  # TODO make this jq command better
-  if [[ "$RELEASE" != "latest" ]] && ! jq > /dev/null '.tag' -er <<< "$release_info_json"; then
-    FATAL "specified release $RELEASE not found"
-    exit 5
-  fi
+  # shellcheck disable=2155
+  verify_release "${RELEASE:-latest}"
 
-  # defaults to the old times
-  NODE_VERSION_REQUIRED="$(jq -r '.nodeVersion // "12.22.9"' <<< "$release_info_json")"
-  DEBUG "NODE_VERSION_REQUIRED: $NODE_VERSION_REQUIRED"
+  # shellcheck disable=2155
+  local node_version_required="$(get_required_node_version)"
+  DEBUG "node_version_required: $node_version_required"
 
-  install_node
-
-  # defaulting mongodb version to 4.2
-  local mongodb_supported_versions_json="$(jq -r '.compatibleMongoVersions // ["4.2"]' <<< "$release_info_json")"
-  DEBUG "mongodb_supported_versions_json: $mongodb_supported_versions_json"
+  # shellcheck disable=2155
+  local node_bin_path="$(install_node "$node_version_required")"
+  DEBUG "node_bin_path: $node_bin_path"
 
   if command_exists "mongod"; then
 
@@ -151,34 +141,31 @@ run_install() {
       exit 2
     }
 
-    local local_mongod_version="$(mongo --quiet --eval 'db.version().split(".").splice(0, 2).join(".")')"
-    if ! jq > /dev/null '. | index('"$local_mongod_version"')' -e <<< "$mongodb_supported_versions_json"; then
+    local local_mongod_version="$(get_current_mongodb_version)"
+    if is_mongodb_version_supported "$local_mongod_version"; then
       if ! ((USE_MONGO)); then
         FATAL "installed mongodb version isn't supported." \
-          " supported versions are $(jq '. | join(", ")' <<< "$mongodb_supported_versions_json")." \
+          " supported versions are $(get_supported_mongodb_versions_str)." \
           " use --use-mongo option to ignore this"
         exit 2
       fi
       WARN "your installed version isn't supported; Rocket.Chat may not work as expected"
-      WARN "supported versions are $(jq '. | join(", ")' <<< "$mongodb_supported_versions_json")."
+      WARN "supported versions are $(get_supported_mongodb_versions_str)."
     fi
-    local storage_engine="$(mongo --quiet --eval 'db.serverStatus().storageEngine.name')"
-    [[ "$storage_engine" == "wiredTiger" ]] ||
-      WARN "you are currently using $storage_engine storage engine." \
-        "using wiredTiger storage engine is recommended"
+    is_storage_engine_wiredTiger || WARN "you are currently not using wiredTiger storage engine."
   elif [[ -n "$MONGO_VERSION" ]]; then
     DEBUG "MONGO_VERSION: $MONGO_VERSION"
     # mongo version was passed
-    jq > /dev/null -e '. | index('"$MONGO_VERSION"')' <<< "$mongodb_supported_versions_json" ||
+    is_mongodb_version_supported "$MONGO_VERSION" ||
       FATAL "mongodb version $MONGO_VERSION is not supported by Rocket.Chat version $RELEASE" \
-        "either pass a supported version from ($(jq '. | join(", ")' -r <<< "$mongodb_supported_versions_json")) or" \
+        "either pass a supported version from ($(get_supported_mongodb_versions_str)) or" \
         "don't mention a mongodb version"
     exit 2
   else
     DEBUG "installing latest mongodb version for Rocket.Chat release $RELEASE"
-    MONGO_VERSION="$(jq -r 'sort_by(.) | reverse | .[0]' <<< "$mongodb_supported_versions_json")"
+    MONGO_VERSION="$(get_latest_supported_mongodb_version)"
     DEBUG "MONGO_VERSION: $MONGO_VERSION"
-    install_mongodb
+    install_mongodb "$MONGO_VERSION"
   fi
 
 }
