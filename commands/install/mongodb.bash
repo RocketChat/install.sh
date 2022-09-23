@@ -74,7 +74,7 @@ configure_mongodb() {
 
   local mongo_response_json=
   if ! mongo_response_json="$(
-    mongo --quiet --eval "printjson(rs.initiate({_id: $replicaset_name, members: [{ _id: 0, host: 'localhost:27017' }]}))"
+    mongo --quiet --eval "printjson(rs.initiate({_id: '$replicaset_name', members: [{ _id: 0, host: 'localhost:27017' }]}))"
   )"; then
     FATAL "failed to initiate replicaset; Rocket.Chat won't work without replicaset enabled. exiting ..."
     exit 3
