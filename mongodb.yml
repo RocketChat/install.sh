@@ -1,0 +1,15 @@
+net:
+  bindIp: 127.0.0.1
+  port: 27017
+setParameter:
+  enableLocalhostAuthBypass: false
+storage:
+  dbPath: $SNAP_COMMON
+  journal:
+    enabled: true
+systemLog:
+  destination: syslog
+processManagement:
+  pidFilePath: $SNAP_COMMON/mongod.pid
+replication:
+  replSetName: rs0

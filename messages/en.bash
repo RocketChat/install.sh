@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source "./b-log/b-log.sh"
+_source "b-log/b-log.sh"
 
 show_long_help() {
   cat << EOM

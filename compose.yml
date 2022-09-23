@@ -1,0 +1,9 @@
+services:
+  host:
+    image: "ubuntu:focal"
+    volumes:
+      - ./:/mnt:rw
+    working_dir: /mnt
+    command:
+      - sleep
+      - 1d
