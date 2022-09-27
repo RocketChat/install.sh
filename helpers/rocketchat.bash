@@ -53,3 +53,44 @@ get_supported_mongodb_versions_str() {
 get_latest_supported_mongodb_version() {
   jq 'sort_by(.) | reverse | .[0]' -r <<< "$COMPATIBLE_MONGODB_VERSIONS_JSON"
 }
+
+configure_rocketchat() {
+  echo
+}
+
+insatll_rocketchat() {
+  local release="${1?must pass a release version}"
+  local where="${2?must pass destination}"
+  # shellcheck disable=SC2155
+  DEBUG "destination: $where"
+  local parent_dir="$(dirname "${where}")"
+  DEBUG "parent_dir: $parent_dir"
+
+  local run_cmd=
+  if is_dir_accessible "$parent_dir"; then
+    DEBUG "$parent_dir not accessible"
+    DEBUG "falling back to using sudo"
+    run_cmd="sudo"
+  fi
+  
+  local archive_file="$where/rocket.chat.$release.tar.gz"
+
+  $run_cmd mkdir "$where"
+
+  INFO "downloading Rocket.Chat"
+  if ! $run_cmd curl -Lo "$archive_file" "https://releases.rocket.chat/$release/download" --retry ; then
+    FATAL "failed to download rocketchat archive; exiting..."
+    exit 5
+  fi
+
+  INFO "extracting archive"
+  if ! $run_cmd tar xzf "$archive_file" --strip-components=1 -C "$where"; then
+    FATAL "unable to extract rocketchat archive; exiting ..."
+    exit 6
+  fi
+
+  INFO "installing nodejs modules"
+  npm i --production ||
+    ERROR "failed to install all nodejs modules; exiting..."
+
+}

@@ -2,10 +2,9 @@
 
 _source "messages/en.bash"
 _source "b-log/b-log.sh"
-_source "commands/install/node.bash"
-_source "commands/install/mongodb.bash"
 _source "helpers/rocketchat.bash"
 _source "helpers/mongodb.bash"
+_source "helpers/nodejs.bash"
 
 # All following functions are going to reuse these variables
 ROOT_URL=
@@ -21,6 +20,8 @@ INSTALL_NODE=
 N=
 NVM=
 M=
+
+ROCKETCHAT_DIRECTORY=
 
 NODE_VERSION_REQUIRED=
 NODE_PATH=
@@ -55,7 +56,7 @@ run_install() {
 
         DEBUG "LETSENCRYPT_EMAIL: $LETSENCRYPT_EMAIL"
         ;;
-      --version)
+      --version | --release)
         RELEASE="$2"
         shift 2
 
@@ -135,9 +136,9 @@ run_install() {
 
     INFO "detecting existing mongodb installation"
 
-    mongo --quiet --eval 'db.adminCommand({ ping: 1 }).ok' | grep -q 1 || {
+    is_mongod_ready || {
       FATAL "failed to connect to mongodb; required to check configuration" \
-        " please make sure installed mongodb server is running before runnning this script"
+        "please make sure installed mongodb server is running before runnning this script"
       exit 2
     }
 
@@ -152,6 +153,7 @@ run_install() {
       WARN "your installed version isn't supported; Rocket.Chat may not work as expected"
       WARN "supported versions are $(get_supported_mongodb_versions_str)."
     fi
+    # TODO decide if this needs to be a FATAL error
     is_storage_engine_wiredTiger || WARN "you are currently not using wiredTiger storage engine."
   elif [[ -n "$MONGO_VERSION" ]]; then
     DEBUG "MONGO_VERSION: $MONGO_VERSION"
@@ -168,4 +170,6 @@ run_install() {
     install_mongodb "$MONGO_VERSION"
   fi
 
+
+  # we have node and mongodb installed at this point
 }

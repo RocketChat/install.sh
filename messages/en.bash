@@ -220,3 +220,8 @@ print_unknown_command_argument() {
   show_long_help
   exit 1
 }
+
+do_something() {
+  ERROR "something is broken for sure"
+  exit 1
+}
