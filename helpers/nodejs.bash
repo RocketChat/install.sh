@@ -46,18 +46,23 @@ _install_n() {
 }
 
 _nvm_install_node() {
+  # @returns node binary path
   local node_version="${1?node version must be passed}"
   # TODO better management
   if ! nvm install "$node_version"; then
     FATAL "failed to install node $node_version using nvm"
     exit 2
   fi
-  funcreturn "$(nvm which "$node_version")" || ERROR "failed to capture installed node binary path"
+  funcreturn "$(nvm which "$node_version")" || {
+    ERROR "failed to capture installed node binary path"
+    WARN "defaulting to /usr/local/bin/node"
+    funcreturn "/usr/local/bin/node"
+  }
 }
 
 _n_install_node() {
   local node_version="${1?node version must be passed}"
-  if ! n install "$node_version"; then 
+  if ! n install "$node_version"; then
     FATAL "failed to install $node_version using n"
     exit 1
   fi
@@ -80,11 +85,15 @@ _nvm() {
 }
 
 _manual_install_node() {
+  # @returns node binary path
   local node_version="${1?node version must be passed}"
   local archive_file_name="node-$node_version-linux-x64"
   local url="https://nodejs.org/dist/$node_version/$archive_file_name.tar.xz"
   INFO "downloading node $node_version installation archive"
-  if ! (cd /tmp; curl -LO --fail "$url"); then
+  if ! (
+        cd /tmp
+                 curl -LO --fail "$url"
+  ); then
     FATAL "failed to download nodejs archive"
     FATAL "cannot move on with installation without a valid node binary; exiting..."
     exit 5
@@ -104,13 +113,43 @@ _manual_install_node() {
   funcreturn "${archive_file_name}/bin/node"
 }
 
+# change usage of globals
 install_node() {
-  local node_version="${1?nodejs version string required}"
+  # @returns node binary path
+  local \
+    OPTARG \
+    _opt \
+    node_version \
+    node_exists \
+    install_node \
+    n \
+    nvm
 
-  local node_exists
+  while getopts "v:ynb" _opt; do
+    case "$_opt" in
+      v)
+        node_version="$OPTARG"
+                               ;;
+      y)
+        install_node=1
+                       ;;
+      n)
+        n=1
+            ;;
+      b)
+        nvm=1
+              ;;
+      *)
+        ERROR "unknown option"
+                               ;;
+    esac
+  done
+
+  node_version="${node_version?nodejs version string required}"
+
   command_exists "node" && node_exists=1 || node_exists=0
 
-  if ! ((INSTALL_NODE)) && ((node_exists)); then
+  if ! ((install_node)) && ((node_exists)); then
     print_node_version_error_and_exit
   fi
 
@@ -119,12 +158,12 @@ install_node() {
     return
   fi
 
-  if ((N)); then
+  if ((n)); then
     _n "$node_version"
     return
   fi
 
-  if ((NVM)); then
+  if ((nvm)); then
     _nvm "$node_version"
     return
   fi
@@ -132,4 +171,3 @@ install_node() {
   # default
   _manual_install_node "$node_version"
 }
-

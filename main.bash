@@ -20,7 +20,10 @@ handle_arguments() {
          show_long_help
          exit 0
                 ;;
-    "install") run_install ;;
+    "install")
+      is_host_supported
+      run_install "$@"
+                       ;;
     "check-update" | "check-updates") ;;
     "update") ;;
     "upgrade-rocketchatctl") ;;
@@ -28,12 +31,12 @@ handle_arguments() {
     "backup") ;;
     *) print_unknown_command_argument ;;
   esac
-
 }
 
 # TODO add --dry-run option
 
 entrypoint() {
+  # TODO change this
   if ! am_i_root; then
     FATAL "you must use a non-root account for this script to work"
     exit 1
@@ -41,27 +44,15 @@ entrypoint() {
 
   SUCCESS "using non-root user"
 
-  is_host_supported
-
-  run_install "$@"
-
+  handle_arguments "$@"
 }
 
-exec 3>&1
-
-# TODO: change this accroding to environment variable and cmd line arguments
-LOG_LEVEL_ALL
+# shellcheck disable=2015
+[[ -n "$DEBUG" ]] &&
+  LOG_LEVEL_DEBUG ||
+  LOG_LEVEL_INFO
 
 LOG_LEVELS+=("250" "SUCCESS" "$B_LOG_DEFAULT_TEMPLATE" "\e[1;32m" "\e[0m")
-
-# redirect fix
-FATAL()    { B_LOG_print_message "${LOG_LEVEL_FATAL}"   "$@" >&3; }
-ERROR()    { B_LOG_print_message "${LOG_LEVEL_ERROR}"   "$@" >&3; }
-WARN()     { B_LOG_print_message "${LOG_LEVEL_WARN}"    "$@" >&3; }
-NOTICE()   { B_LOG_print_message "${LOG_LEVEL_NOTICE}"  "$@" >&3; }
-INFO()     { B_LOG_print_message "${LOG_LEVEL_INFO}"    "$@" >&3; }
-DEBUG()    { B_LOG_print_message "${LOG_LEVEL_DEBUG}"   "$@" >&3; }
-TRACE()    { B_LOG_print_message "${LOG_LEVEL_TRACE}"   "$@" >&3; }
 
 SUCCESS() {
   # don't look at the log

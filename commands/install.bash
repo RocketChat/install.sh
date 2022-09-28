@@ -7,113 +7,121 @@ _source "helpers/mongodb.bash"
 _source "helpers/nodejs.bash"
 
 # All following functions are going to reuse these variables
-ROOT_URL=
-PORT=
-WEBSERVER=
-LETSENCRYPT_EMAIL=
-RELEASE=
-USE_MONGO=
-MONGO_VERSION=
-BIND_LOOPBACK=
-REG_TOKEN=
-INSTALL_NODE=
-N=
-NVM=
-M=
-
-ROCKETCHAT_DIRECTORY=
-
-NODE_VERSION_REQUIRED=
-NODE_PATH=
-
-RELEASE_INFO_ENDPOINT=
-RELEASE_INFO_JSON=
 
 run_install() {
+  local root_url=
+  local port=
+  local webserver=
+  local letsencrypt_email=
+  local release=
+  local use_mongo=
+  local mongo_version=
+  local bind_loopback=
+  local reg_token=
+  local install_node=
+  local n=
+  local nvm=
+  local m=
+
+  local rocketchat_directory=
+
+  local node_version_required=
+  local node_path=
+
+  local release_info_endpoint=
+  local release_info_json=
+
+  local install_node_arg=
   while [[ -n "$1" ]]; do
     case "$1" in
       --root-url)
-        ROOT_URL="$2"
+        root_url="$2"
         shift 2
 
-        DEBUG "ROOT_URL: $ROOT_URL"
+        DEBUG "root_url: $root_url"
         ;;
       --port)
-        PORT="$2"
+        port="$2"
         shift 2
 
-        DEBUG "PORT: $PORT"
+        DEBUG "port: $port"
         ;;
       --webserver)
-        WEBSERVER="$2"
+        webserver="$2"
         shift 2
 
-        DEBUG "WEBSERVER: $WEBSERVER"
+        DEBUG "webserver: $webserver"
         ;;
       --letsencrypt-email)
-        LETSENCRYPT_EMAIL="$2"
+        letsencrypt_email="$2"
         shift 2
 
-        DEBUG "LETSENCRYPT_EMAIL: $LETSENCRYPT_EMAIL"
+        DEBUG "letsencrypt_email: $letsencrypt_email"
         ;;
       --version | --release)
-        RELEASE="$2"
+        release="$2"
         shift 2
 
-        DEBUG "RELEASE: $RELEASE"
+        DEBUG "release: $release"
         ;;
       --install-node)
-        INSTALL_NODE=1
+        install_node=1
         shift
 
-        DEBUG "INSTALL_NODE $INSTALL_NODE"
+        install_node_arg="-y "
+
+        DEBUG "install_node $install_node"
         ;;
       --use-mongo)
-        USE_MONGO=1
+        use_mongo=1
         shift
 
-        DEBUG "USE_MONGO: $USE_MONGO"
+        DEBUG "use_mongo: $use_mongo"
         ;;
       --mongo-version)
         # shellcheck disable=SC2206
         local mongod_version=(${2//./ })
         [[ -n "${mongod_version[2]}" ]] && NOTICE "patch number in mongodb version string will be ignored"
-        MONGO_VERSION="${mongod_version[0]}.${mongod_version[1]}"
+        mongo_version="${mongod_version[0]}.${mongod_version[1]}"
         shift 2
 
-        DEBUG "MONGO_VERSION: $MONGO_VERSION"
+        DEBUG "mongo_version: $mongo_version"
         DEBUG "MONGO_[MAJOR, MINOR, PATCH(IGNORED)]: ${mongod_version[*]}"
         ;;
       --use-m)
-        M=1
+        m=1
         shift
 
-        DEBUG "M: $M"
+        DEBUG "m: $m"
         ;;
       --bind-loopback)
         # TODO: default set this to true if webserver != none
-        BIND_LOOPBACK=1
+        bind_loopback=1
         shift
 
-        DEBUG "BIND_LOOPBACK: $BIND_LOOPBACK"
+        DEBUG "bind_loopback: $bind_loopback"
         ;;
       --reg-token)
-        REG_TOKEN="$2"
+        reg_token="$2"
         shift 2
 
-        DBEUG "REG_TOKEN: ${REG_TOKEN+*****}"
+        DBEUG "reg_token: ${reg_token+*****}"
         ;;
       --use-n)
-        N=1
+        n=1
         shift
 
-        DEBUG "N: $N"
+        install_node_arg+="-n "
+
+        DEBUG "n: $n"
         ;;
       --use-nvm)
-        NVM=1
+        nvm=1
         shift
 
-        DEBUG "NVM: $NVM"
+        install_node_arg+="-b "
+
+        DEBUG "nvm: $nvm"
         ;;
       *)
         print_unknown_command_argument
@@ -122,14 +130,14 @@ run_install() {
   done
 
   # shellcheck disable=2155
-  verify_release "${RELEASE:-latest}"
+  verify_release "${release:-latest}"
 
   # shellcheck disable=2155
-  local node_version_required="$(get_required_node_version)"
+  local node_version_required="$(funcrun get_required_node_version)"
   DEBUG "node_version_required: $node_version_required"
 
   # shellcheck disable=2155
-  local node_bin_path="$(install_node "$node_version_required")"
+  local node_bin_path="$(funcrun install_node -v "$node_version_required" "$install_node_arg")"
   DEBUG "node_bin_path: $node_bin_path"
 
   if command_exists "mongod"; then
@@ -142,34 +150,34 @@ run_install() {
       exit 2
     }
 
-    local local_mongod_version="$(get_current_mongodb_version)"
+    local local_mongod_version="$(funcrun get_current_mongodb_version)"
     if is_mongodb_version_supported "$local_mongod_version"; then
-      if ! ((USE_MONGO)); then
+      if ! ((use_mongo)); then
         FATAL "installed mongodb version isn't supported." \
           " supported versions are $(get_supported_mongodb_versions_str)." \
           " use --use-mongo option to ignore this"
         exit 2
       fi
       WARN "your installed version isn't supported; Rocket.Chat may not work as expected"
-      WARN "supported versions are $(get_supported_mongodb_versions_str)."
+      WARN "supported versions are $(funcrun get_supported_mongodb_versions_str)."
     fi
     # TODO decide if this needs to be a FATAL error
     is_storage_engine_wiredTiger || WARN "you are currently not using wiredTiger storage engine."
-  elif [[ -n "$MONGO_VERSION" ]]; then
-    DEBUG "MONGO_VERSION: $MONGO_VERSION"
+  elif [[ -n "$mongo_version" ]]; then
+    DEBUG "mongo_version: $mongo_version"
     # mongo version was passed
-    is_mongodb_version_supported "$MONGO_VERSION" ||
-      FATAL "mongodb version $MONGO_VERSION is not supported by Rocket.Chat version $RELEASE" \
+    is_mongodb_version_supported "$mongo_version" ||
+      FATAL "mongodb version $mongo_version is not supported by Rocket.Chat version $release" \
         "either pass a supported version from ($(get_supported_mongodb_versions_str)) or" \
         "don't mention a mongodb version"
     exit 2
   else
-    DEBUG "installing latest mongodb version for Rocket.Chat release $RELEASE"
-    MONGO_VERSION="$(get_latest_supported_mongodb_version)"
-    DEBUG "MONGO_VERSION: $MONGO_VERSION"
-    install_mongodb "$MONGO_VERSION"
+    DEBUG "installing latest mongodb version for Rocket.Chat release $release"
+    mongo_version="$(funcrun get_latest_supported_mongodb_version)"
+    DEBUG "mongo_version: $mongo_version"
+    install_mongodb "$mongo_version"
   fi
 
-
   # we have node and mongodb installed at this point
+  install_rocketchat "$release"
 }

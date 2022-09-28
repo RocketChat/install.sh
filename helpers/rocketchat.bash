@@ -9,6 +9,7 @@ export COMPATIBLE_MONGODB_VERSIONS_JSON=
 verify_release() {
   # @description make sure the version passed is right
   # @params version
+  # @exits on error
   local release="${1?release version must be passed}"
   INFO "verifying passed version ($release) if it exists"
   local release_info_endpoint="https://releases.rocket.chat/$release/info"
@@ -34,7 +35,7 @@ verify_release() {
 
 get_required_node_version() {
   # @description parse release_info_json to get the required nodejs version
-  # @params
+  # @returns required nodejs version for current rocketchat version
   local node_required_version=
   node_required_version="$(jq '.nodeVersion // "12.22.9"' -r <<< "$RELEASE_INFO_JSON")"
   funcreturn "$node_required_version"
@@ -42,25 +43,44 @@ get_required_node_version() {
 
 is_mongodb_version_supported() {
   # @description is passed version part of compatibleMongoVersions?
+  # @returns true | false
   local version="${1?mongodb version must be non-empty}"
   jq > /dev/null -er '. | index('"$version"')'
 }
 
 get_supported_mongodb_versions_str() {
+  # @nofuncrun
   jq -r '. | join(", ")' <<< "$COMPATIBLE_MONGODB_VERSIONS_JSON"
 }
 
 get_latest_supported_mongodb_version() {
+  # @nofuncrun
   jq 'sort_by(.) | reverse | .[0]' -r <<< "$COMPATIBLE_MONGODB_VERSIONS_JSON"
 }
 
-configure_rocketchat() {
-  echo
-}
-
 insatll_rocketchat() {
-  local release="${1?must pass a release version}"
-  local where="${2?must pass destination}"
+  # @description installs passed Rocket.Chat version
+  # @exits on ERROR
+  local \
+    OPTARG \
+    _opt \
+    release \
+    where
+
+  while getopts "v:w:" _opt; do
+    case "$_opt" in
+      v)
+        release="$OPTARG"
+                          ;;
+      w)
+        where="$OPTARG"
+                        ;;
+      *) ERROR "unknown argument passed" ;;
+    esac
+  done
+
+  release="${release?must pass a release version}"
+  where="${where?must pass destination}"
   # shellcheck disable=SC2155
   DEBUG "destination: $where"
   local parent_dir="$(dirname "${where}")"
@@ -72,13 +92,13 @@ insatll_rocketchat() {
     DEBUG "falling back to using sudo"
     run_cmd="sudo"
   fi
-  
+
   local archive_file="$where/rocket.chat.$release.tar.gz"
 
   $run_cmd mkdir "$where"
 
   INFO "downloading Rocket.Chat"
-  if ! $run_cmd curl -Lo "$archive_file" "https://releases.rocket.chat/$release/download" --retry ; then
+  if ! $run_cmd curl -Lo "$archive_file" "https://releases.rocket.chat/$release/download" --retry; then
     FATAL "failed to download rocketchat archive; exiting..."
     exit 5
   fi
@@ -91,6 +111,5 @@ insatll_rocketchat() {
 
   INFO "installing nodejs modules"
   npm i --production ||
-    ERROR "failed to install all nodejs modules; exiting..."
-
+    ERROR "failed to install all nodejs modules; Rocket.Chat may not work as expected"
 }

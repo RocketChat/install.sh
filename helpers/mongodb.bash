@@ -1,19 +1,20 @@
 #!/bin/bash
 
 _source "b-log/b-log.sh"
+_source "helpers/lib.bash"
 
 M_BIN_URL="https://raw.githubusercontent.com/aheckmann/m/master/bin/m"
 
 get_current_mongodb_storage_engine() {
-  mongo --quiet --eval 'db.serverStatus().storageEngine.name'
+  funcreturn "$(mongo --quiet --eval 'db.serverStatus().storageEngine.name')"
 }
 
 get_current_mongodb_version() {
-  mongo --quiet --eval 'db.version.split(".").splice(0, 2).join(".")'
+  funcreturn "$(mongo --quiet --eval 'db.version.split(".").splice(0, 2).join(".")')"
 }
 
 is_storage_engine_wiredTiger() {
-  [[ "wiredTiger" == "$(get_current_mongodb_storage_engine)" ]]
+  [[ "wiredTiger" == "$(funcrun get_current_mongodb_storage_engine)" ]]
 }
 
 is_mongod_ready() {
@@ -21,6 +22,7 @@ is_mongod_ready() {
 }
 
 _install_m() {
+  [[ -d ~/.local/bin ]] || mkdir ~/.local/bin -p
   curl -Lo ~/.local/bin/m "$M_BIN_URL" --fail || {
     FATAL "failed to install m. you can try using manual install method instead"
     exit 2
@@ -28,10 +30,12 @@ _install_m() {
 }
 
 _m_install_mongodb() {
+  # @returns install path
   m "$MONGO_VERSION" || {
     FATAL "failed to install mongodb version $MONGO_VERSION; exiting ..."
     exit 2
   }
+  funcreturn "$HOME/.local/bin"
 }
 
 _deb_setup_repo() {
@@ -75,14 +79,22 @@ EOF
 }
 
 _manual_install_mongodb() {
+  # @returns install path
   install_pkg "mongodb-org" || {
     FATAL "failed to install mongodb version $MONGO_VERSION; exiting ..."
     exit 2
   }
+  funcreturn "$(dirname "$(which mongod)")"
 }
 
 configure_mongodb() {
   # assume yq installed
+  local _bin_path="${1?mongodb binary path must be provided}"
+
+  function _mongo {
+    "${_bin_path%/}/mongo" "$@"
+  }
+
   local replicaset_name="rs0"
   yq -i e ".replication.replSetName = $replicaset_name" "/etc/mongod.conf" ||
     ERROR "failed to edit mognodb config; following steps may fail as well"
@@ -95,7 +107,7 @@ configure_mongodb() {
 
   local mongo_response_json=
   if ! mongo_response_json="$(
-    mongo --quiet --eval "printjson(rs.initiate({_id: '$replicaset_name', members: [{ _id: 0, host: 'localhost:27017' }]}))"
+    _mongo --quiet --eval "printjson(rs.initiate({_id: '$replicaset_name', members: [{ _id: 0, host: 'localhost:27017' }]}))"
   )"; then
     FATAL "failed to initiate replicaset; Rocket.Chat won't work without replicaset enabled. exiting ..."
     exit 3
@@ -115,14 +127,35 @@ configure_mongodb() {
 }
 
 install_mongodb() {
-  if ((M)); then
+  # @returns install path
+  local \
+    OPTARG \
+    _opt \
+    m \
+    mongodb_version \
+    _bin_path
+
+  while getopts "mv:" _opt; do
+    case "$_opt" in
+      m)
+        m=1
+            ;;
+      v)
+        mongodb_version="$OPTARG"
+                                  ;;
+      *) ERROR "unknown option" ;;
+    esac
+  done
+
+  if ((m)); then
     INFO "using m for mongodb"
     _install_m
-    _m_install_mongodb
+    _bin_path="$(funcrun _m_install_mongodb "$mongodb_version")"
   else
     INFO "manually installing mongodb"
-    _manual_install_mongodb
+    _bin_path="$(funcrun _manual_install_mongodb "$mongodb_version")"
   fi
 
-  configure_mongodb
+  configure_mongodb "$_bin_path"
+  funcreturn "$_bin_path"
 }
