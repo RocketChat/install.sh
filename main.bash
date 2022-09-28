@@ -9,7 +9,7 @@ _source() {
 
 # TODO change this
 _source "messages/en.bash"
-_source "commands/install/install.bash"
+_source "commands/install.bash"
 _source "helpers/host.bash"
 _source "helpers/lib.bash"
 _source "b-log/b-log.sh"
