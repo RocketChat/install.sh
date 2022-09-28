@@ -25,7 +25,7 @@ _append_to_shellrc() {
 
 _install_nvm() {
   # https://github.com/nvm-sh/nvm#installation
-  INFO "installing nvm"
+  INFO "nstalling nvm"
   if ! curl -so- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash; then
     FATAL "failed to install nvm; halting installation"
     exit 1
@@ -46,38 +46,44 @@ _install_n() {
 }
 
 _nvm_install_node() {
+  local node_version="${1?node version must be passed}"
   # TODO better management
-  if ! nvm install "$NODE_VERSION_REQUIRED"; then
-    FATAL "failed to install node $NODE_VERSION_REQUIRED using nvm"
+  if ! nvm install "$node_version"; then
+    FATAL "failed to install node $node_version using nvm"
     exit 2
   fi
-  funcreturn "$(nvm which "$NODE_VERSION_REQUIRED")" || ERROR "failed to capture installed node binary path"
+  funcreturn "$(nvm which "$node_version")" || ERROR "failed to capture installed node binary path"
 }
 
 _n_install_node() {
-  if ! n install "$NODE_VERSION_REQUIRED"; then 
-    FATAL "failed to install $NODE_VERSION_REQUIRED using n"
+  local node_version="${1?node version must be passed}"
+  if ! n install "$node_version"; then 
+    FATAL "failed to install $node_version using n"
     exit 1
   fi
-  funcreturn "$(nvm which "$NODE_VERSION_REQUIRED")" || ERROR "failed to capture installed node binary path"
+  # FIXME check n which
+  funcreturn "/usr/local/bin/node"
 }
 
 _n() {
+  local node_version="${1?node version must be passed}"
   INFO "using n to manage nodejs"
   _install_n
-  _n_install_node
+  _n_install_node "$node_version"
 }
 
 _nvm() {
+  local node_version="${1?node version must be passed}"
   INFO "using nvm to manage nodejs"
   _install_nvm
-  _nvm_install_node
+  _nvm_install_node "$node_version"
 }
 
 _manual_install_node() {
-  local archive_file_name="node-$NODE_VERSION_REQUIRED-linux-x64"
-  local url="https://nodejs.org/dist/$NODE_VERSION_REQUIRED/$archive_file_name.tar.xz"
-  INFO "downloading node $NODE_VERSION_REQUIRED installation archive"
+  local node_version="${1?node version must be passed}"
+  local archive_file_name="node-$node_version-linux-x64"
+  local url="https://nodejs.org/dist/$node_version/$archive_file_name.tar.xz"
+  INFO "downloading node $node_version installation archive"
   if ! (cd /tmp; curl -LO --fail "$url"); then
     FATAL "failed to download nodejs archive"
     FATAL "cannot move on with installation without a valid node binary; exiting..."
@@ -99,7 +105,7 @@ _manual_install_node() {
 }
 
 install_node() {
-  local node_verison="${1?nodejs version string required}"
+  local node_version="${1?nodejs version string required}"
 
   local node_exists
   command_exists "node" && node_exists=1 || node_exists=0
@@ -108,22 +114,22 @@ install_node() {
     print_node_version_error_and_exit
   fi
 
-  if ((node_exists)) && node -e "process.exit(process.version === 'v${node_verison}' ? 0 : 1)"; then
+  if ((node_exists)) && node -e "process.exit(process.version === 'v${node_version}' ? 0 : 1)"; then
     SUCCESS "node version satisfied"
     return
   fi
 
   if ((N)); then
-    _n
+    _n "$node_version"
     return
   fi
 
   if ((NVM)); then
-    _nvm
+    _nvm "$node_version"
     return
   fi
 
   # default
-  _manual_install_node
+  _manual_install_node "$node_version"
 }
 
