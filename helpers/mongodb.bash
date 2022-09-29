@@ -35,24 +35,18 @@ _install_m() {
 
 _m_install_mongodb() {
   # @returns install path
-  local \
-    mongodb_version \
-    m_path
 
-  mongodb_version="${1?mongodb version must be passed}"
-  m_path="$(funcrun _install_m)"
+  local mongodb_version="${1?mongodb version must be passed}"
 
-  _m() {
-    "$m_path" "$@"
-  }
+  _install_m
 
-  _m "$mongodb_version" || {
+  m "$mongodb_version" || {
     FATAL "failed to install mongodb version $mongodb_version; exiting ..."
     exit 2
   }
 
   # m returns path without binary name appended
-  funcreturn "$(_m which "$mongodb_version")"
+  funcreturn "$(m which "$mongodb_version")"
 }
 
 _deb_setup_repo() {
