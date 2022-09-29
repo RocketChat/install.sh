@@ -5,6 +5,7 @@ _source "b-log/b-log.sh"
 _source "helpers/rocketchat.bash"
 _source "helpers/mongodb.bash"
 _source "helpers/nodejs.bash"
+_source "helpers/lib.bash"
 
 # All following functions are going to reuse these variables
 
@@ -32,6 +33,7 @@ run_install() {
   local release_info_json=
 
   local install_node_arg=
+  local install_mongodb_arg=
   while [[ -n "$1" ]]; do
     case "$1" in
       --root-url)
@@ -85,12 +87,16 @@ run_install() {
         mongo_version="${mongod_version[0]}.${mongod_version[1]}"
         shift 2
 
+        install_mongodb_arg+="-v $mongo_version "
+
         DEBUG "mongo_version: $mongo_version"
         DEBUG "MONGO_[MAJOR, MINOR, PATCH(IGNORED)]: ${mongod_version[*]}"
         ;;
       --use-m)
         m=1
         shift
+
+        install_mongodb_arg+="-m "
 
         DEBUG "m: $m"
         ;;
@@ -136,6 +142,7 @@ run_install() {
   local node_version_required="$(funcrun get_required_node_version)"
   DEBUG "node_version_required: $node_version_required"
 
+  _debug "install_node_arg"
   # shellcheck disable=2155
   local node_bin_path="$(funcrun install_node -v "$node_version_required" "$install_node_arg")"
   DEBUG "node_bin_path: $node_bin_path"
@@ -173,12 +180,14 @@ run_install() {
       exit 2
     }
     INFO "installing mongodb version $mongo_version"
-    install_mongodb "$mongo_version"
+    _debug "install_mongodb_arg"
+    install_mongodb "$install_mongodb_arg"
   else
     DEBUG "installing latest mongodb version for Rocket.Chat release $release"
     mongo_version="$(funcrun get_latest_supported_mongodb_version)"
     DEBUG "mongo_version: $mongo_version"
-    install_mongodb "$mongo_version"
+    _debug "install_mongodb_arg"
+    install_mongodb "$install_mongodb_arg"
   fi
 
   # we have node and mongodb installed at this point
