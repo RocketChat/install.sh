@@ -147,3 +147,11 @@ insatll_rocketchat() {
   npm i --production ||
     ERROR "failed to install all nodejs modules; Rocket.Chat may not work as expected"
 }
+
+configure_mongodb() {
+  echo
+}
+
+configure_rocketchat() {
+  echo
+}

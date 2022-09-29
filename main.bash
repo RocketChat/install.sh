@@ -60,7 +60,7 @@ LOG_LEVELS+=("250" "SUCCESS" "$B_LOG_DEFAULT_TEMPLATE" "\e[1;32m" "\e[0m")
 SUCCESS() {
   # don't look at the log
   # i want FUNCNAME to be just right
-  B_LOG_print_message 250 "${*?message required}" >&3
+  B_LOG_print_message 250 "${*?message required}"
 }
 
 entrypoint "$@"
