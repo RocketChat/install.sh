@@ -1,6 +1,7 @@
 #! /usr/bin/env bash
 
 _source "messages/en.bash"
+_source "b-log/b-log.sh"
 
 {
   # shellcheck disable=2155
@@ -21,7 +22,7 @@ _debug() {
     _var_value
   _var_name="${1?variable name must be passed}"
   _var_value="$(eval printf \$"$_var_name")"
-  DEBUG "${_var_name}: ${_var_value}"
+  B_LOG_print_message "${LOG_LEVEL_DEBUG}" "${_var_name}: ${_var_value}"
 }
 
 # @public
