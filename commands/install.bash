@@ -143,6 +143,8 @@ run_install() {
   local node_version_required="$(funcrun get_required_node_version)"
   DEBUG "node_version_required: $node_version_required"
 
+  install_node_arg+=("-v" "$node_version_required")
+
   _debug "install_node_arg"
   # shellcheck disable=2155
   local node_bin_path="$(funcrun install_node "${install_node_arg[@]}")"

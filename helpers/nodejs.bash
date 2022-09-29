@@ -133,7 +133,6 @@ _manual_install_node() {
 # change usage of globals
 install_node() {
   # @returns node binary path
-  echo "$@"
   local \
     OPTARG \
     _opt \
