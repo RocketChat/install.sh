@@ -83,6 +83,15 @@ EOF
 _manual_install_mongodb() {
   # @returns install path
 
+  case "$DISTRO" in
+    debian | ubuntu)
+      _deb_setup_repo
+                      ;;
+    centos)
+      _rpm_setup_repo
+                      ;;
+  esac
+
   local mongodb_version="${1?mongodb version must be passed}"
   install_pkg "mongodb-org" || {
     FATAL "failed to install mongodb version $mongodb_version; exiting ..."
