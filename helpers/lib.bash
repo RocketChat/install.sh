@@ -3,21 +3,8 @@
 _source "messages/en.bash"
 _source "b-log/b-log.sh"
 
-{
-  # shellcheck disable=2155
-  if ! declare -g __func_returns="$(mktemp -t rocketchatctl__func_returnsXXXXXXXXXX)"; then
-    FATAL "failed to pipe function output"
-    exit 10
-  fi
-
-  exec 3> "$__func_returns"
-  exec 4>&1
-}
-
-{
-  declare -gA __pipes=()
-  declare -g __PIPE_PREFIX="__rocketchatctl_pipe"
-}
+# TODO remove this
+_source "helpers/functools.bash"
 
 _debug() {
   # @description helper for variable debug messages
@@ -57,16 +44,6 @@ am_i_root() {
   [[ $(id -u) -eq 0 ]]
 }
 
-funcreturn() {
-  echo "$@" >&3
-}
-
-funcrun() {
-  eval "$*" >&4
-  # wish I knew of a better way :/
-  tail -1 "$__func_returns"
-}
-
 is_dir_accessible() {
   local dir="${1?must pass a directory path}"
   if ! [[ -d "$dir" ]]; then
@@ -99,34 +76,5 @@ is_dir_accessible() {
 
   # thanks bash; what I actually mean is ==7
   return $((((dir_perm_oct % 100) % 10) != 7))
-}
-
-background_execute() {
-  local id="${1?job id required}"
-
-  shift
-
-  __pipes["$id"]="/tmp/${__PIPE_PREFIX}_$RANDOM"
-  mkfifo "${__pipes[$id]}"
-
-  trap 'rm -f '"${__pipes[$id]}"'' 1 2 3
-
-  __do() {
-    DEBUG "starting background task $id"
-    printf "$id: %s" "$(funcrun "$@")" > "${__pipes[$id]}";
-    DEBUG "background task $id completed"
-  }
-
-  __do "$@" &
-}
-
-background_read() {
-  local id="${1?job id required}"
-  if ! is "$id" in __pipes; then
-    ERROR "unknown background task id $id"
-    return
-  fi
-
-  funcreturn "$(cat ${__pipes[$id]})"
 }
 
