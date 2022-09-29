@@ -26,14 +26,19 @@ _append_to_shellrc() {
 _install_nvm() {
   # https://github.com/nvm-sh/nvm#installation
   INFO "nstalling nvm"
+  DEBUG "setting NVM_DIR to /opt/nvm"
+  if (sudo mkdir /opt/nvm && sudo chown "$(id -u)":"$(id -g)" /opt/nvm) 2> /dev/null; then
+    export NVM_DIR="/opt/nvm"
+  else
+    WARN "failed to create /opt/nvm; installing nvm in $HOME/.nvm"
+    export NVM_DIR="$HOME/.nvm"
+  fi
+  _debug "NVM_DIR"
   if ! curl -so- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash; then
     FATAL "failed to install nvm; halting installation"
     exit 1
   fi
   SUCCESS "successfully installed nvm"
-  DEBUG "sourcing nvm.sh"
-  # shellcheck disable=SC1091
-  source "$HOME/.nvm/nvm.sh"
 }
 
 _install_n() {
@@ -48,14 +53,16 @@ _install_n() {
 _nvm_install_node() {
   # @returns node binary path
   local node_version="${1?node version must be passed}"
-  # TODO better management
-  if ! nvm install "$node_version"; then
+  _nvm() {
+    BASH_ENV="$NVM_DIR/nvm.sh" bash -c "nvm $*"
+  }
+  if ! _nvm install "$node_version"; then
     FATAL "failed to install node $node_version using nvm"
     exit 2
   fi
-  funcreturn "$(nvm which "$node_version")" || {
+  funcreturn "$(_nvm which "$node_version")" || {
     ERROR "failed to capture installed node binary path"
-    WARN "defaulting to /usr/local/bin/node"
+    WARN "falling back on /usr/local/bin/node"
     funcreturn "/usr/local/bin/node"
   }
 }
@@ -66,8 +73,11 @@ _n_install_node() {
     FATAL "failed to install $node_version using n"
     exit 1
   fi
-  # FIXME check n which
-  funcreturn "/usr/local/bin/node"
+  funcreturn "$(n which "$node_version")" || {
+    ERROR "failed to capture installed node binary path"
+    WARN "falling back on /usr/local/bin/node"
+    funcreturn "/usr/local/bin/node"
+  }
 }
 
 _n() {
@@ -88,7 +98,11 @@ _manual_install_node() {
   # @returns node binary path
   local node_version="${1?node version must be passed}"
   local archive_file_name="node-$node_version-linux-x64"
+  _debug "archive_file_name"
+
   local url="https://nodejs.org/dist/$node_version/$archive_file_name.tar.xz"
+  _debug "url"
+
   INFO "downloading node $node_version installation archive"
   if ! (
         cd /tmp
@@ -99,6 +113,7 @@ _manual_install_node() {
     exit 5
   fi
   INFO "installing nodejs in /opt/nodejs"
+  # TODO handle directory creation better
   sudo mkdir /opt/nodejs
   tar -xJf /tmp/"$archive_file_name".tar.xz -C /opt/nodejs || {
     FATAL "failed to extract archive; nodejs install failed"
@@ -107,10 +122,12 @@ _manual_install_node() {
   }
 
   local new_path="/opt/nodejs/$archive_file_name/bin"
+  _debug "new_path"
+
   _append_to_shellrc "$new_path"
   export PATH="$new_path:$PATH"
 
-  funcreturn "${archive_file_name}/bin/node"
+  funcreturn "${new_path}/bin/node"
 }
 
 # change usage of globals
@@ -129,16 +146,24 @@ install_node() {
     case "$_opt" in
       v)
         node_version="$OPTARG"
-                               ;;
+
+        _debug "node_version"
+                              ;;
       y)
         install_node=1
-                       ;;
+
+        _debug "install_node"
+                              ;;
       n)
         n=1
-            ;;
+
+        _debug "n"
+                   ;;
       b)
         nvm=1
-              ;;
+
+        _debug "nvm"
+                     ;;
       *)
         ERROR "unknown option"
                                ;;
@@ -148,6 +173,7 @@ install_node() {
   node_version="${node_version?nodejs version string required}"
 
   command_exists "node" && node_exists=1 || node_exists=0
+  _debug "node_exists"
 
   if ! ((install_node)) && ((node_exists)); then
     print_node_version_error_and_exit

@@ -9,8 +9,19 @@ _source "messages/en.bash"
     exit 10
   fi
 
-  exec 3>"$__func_returns"
+  exec 3> "$__func_returns"
   exec 4>&1
+}
+
+_debug() {
+  # @description helper for variable debug messages
+  # @params variable name
+  local \
+    _var_name \
+    _var_value
+  _var_name="${1?variable name must be passed}"
+  _var_value="$(eval printf \$"$_var_name")"
+  DEBUG "${_var_name}: ${_var_value}"
 }
 
 # @public
