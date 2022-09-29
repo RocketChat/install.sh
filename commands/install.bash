@@ -144,7 +144,7 @@ run_install() {
 
   _debug "install_node_arg"
   # shellcheck disable=2155
-  local node_bin_path="$(funcrun install_node -v "$node_version_required" "${install_node_arg[@]}")"
+  local node_bin_path="$(funcrun install_node "${install_node_arg[@]}")"
   DEBUG "node_bin_path: $node_bin_path"
 
   if command_exists "mongod"; then

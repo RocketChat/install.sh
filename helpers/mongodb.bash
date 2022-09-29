@@ -49,7 +49,7 @@ _deb_setup_repo() {
   DEBUG "key_file: $key_file"
   DEBUG "repo_file: $repo_file"
 
-  delare -A repo=
+  declare -A repo=
   repo=([ubuntu]="multiverse" [debian]="main")
 
   local repo_url="deb [ arch=amd64 signed-by=$key_file ] https://repo.mongodb.org/apt/$DISTRO $DISTRO_CODENAME/mongodb-org/$MONGO_VERSION ${repo[$DISTRO]}"
