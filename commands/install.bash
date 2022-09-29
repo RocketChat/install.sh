@@ -32,8 +32,8 @@ run_install() {
   local release_info_endpoint=
   local release_info_json=
 
-  local install_node_arg=
-  local install_mongodb_arg=
+  local install_node_arg=()
+  local install_mongodb_arg=()
   while [[ -n "$1" ]]; do
     case "$1" in
       --root-url)
@@ -70,7 +70,7 @@ run_install() {
         install_node=1
         shift
 
-        install_node_arg="-y "
+        install_node_arg+=("-y")
 
         DEBUG "install_node $install_node"
         ;;
@@ -87,7 +87,7 @@ run_install() {
         mongo_version="${mongod_version[0]}.${mongod_version[1]}"
         shift 2
 
-        install_mongodb_arg+="-v $mongo_version "
+        install_mongodb_arg+=("-v" "$mongo_version")
 
         DEBUG "mongo_version: $mongo_version"
         DEBUG "MONGO_[MAJOR, MINOR, PATCH(IGNORED)]: ${mongod_version[*]}"
@@ -96,7 +96,7 @@ run_install() {
         m=1
         shift
 
-        install_mongodb_arg+="-m "
+        install_mongodb_arg+=("-m")
 
         DEBUG "m: $m"
         ;;

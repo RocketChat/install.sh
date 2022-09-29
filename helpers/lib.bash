@@ -19,10 +19,19 @@ _debug() {
   # @params variable name
   local \
     _var_name \
-    _var_value
+    _var_value \
+    _var_str
   _var_name="${1?variable name must be passed}"
-  _var_value="$(eval printf "%s" \$"$_var_name")"
-  B_LOG_print_message "${LOG_LEVEL_DEBUG}" "${_var_name}: ${_var_value}"
+
+  if declare 2> /dev/null -p "$_var_name" | grep -Eq '^declare -a'; then
+    # shellcheck disable=2016
+    _var_str='${'"$_var_name"'[@]}'
+  else
+    _var_str="\$$_var_name"
+  fi
+  _var_value="$(eval echo -n "$_var_str")"
+  # B_LOG_print_message "${LOG_LEVEL_DEBUG}" "${_var_name}: ${_var_value}"
+  echo "${_var_name}: ${_var_value}"
 }
 
 # @public
