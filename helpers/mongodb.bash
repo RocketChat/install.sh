@@ -22,8 +22,11 @@ is_mongod_ready() {
 }
 
 _install_m() {
-  [[ -d ~/.local/bin ]] || mkdir ~/.local/bin -p
-  curl -Lo ~/.local/bin/m "$M_BIN_URL" --fail || {
+  # @returns m path
+  local m_dir="$HOME/.local/bin"
+  [[ -d "$m_dir" ]] || mkdir "$m_dir"
+  grep -Eq "(^$m_dir|[^:]:{1}$m_dir):" <<< "$PATH" || export PATH="$m_dir:$PATH"
+  curl -Lo "$m_dir"/m "$M_BIN_URL" --fail || {
     FATAL "failed to install m. you can try using manual install method instead"
     exit 2
   }
@@ -32,12 +35,24 @@ _install_m() {
 
 _m_install_mongodb() {
   # @returns install path
-  local mongodb_version="${1?mongodb version must be passed}"
-  m "$mongodb_version" || {
+  local \
+    mongodb_version \
+    m_path
+
+  mongodb_version="${1?mongodb version must be passed}"
+  m_path="$(funcrun _install_m)"
+
+  _m() {
+    "$m_path" "$@"
+  }
+
+  _m "$mongodb_version" || {
     FATAL "failed to install mongodb version $mongodb_version; exiting ..."
     exit 2
   }
-  funcreturn "$HOME/.local/bin"
+
+  # m returns path without binary name appended
+  funcreturn "$(_m which "$mongodb_version")"
 }
 
 _deb_setup_repo() {
@@ -166,14 +181,9 @@ install_mongodb() {
 
   if ((m)); then
     INFO "using m for mongodb"
-    _install_m
-    mongodb_bin_path="$(funcrun _m_install_mongodb "$mongodb_version")"
+    _m_install_mongodb "$mongodb_version"
   else
     INFO "manually installing mongodb"
-    mongodb_bin_path="$(funcrun _manual_install_mongodb "$mongodb_version")"
+    _manual_install_mongodb "$mongodb_version"
   fi
-  _debug "mongodb_bin_path"
-
-  configure_mongodb "$mongodb_bin_path"
-  funcreturn "$mongodb_bin_path"
 }
