@@ -60,10 +60,10 @@ _nvm_install_node() {
     FATAL "failed to install node $node_version using nvm"
     exit 2
   fi
-  funcreturn "$(_nvm which "$node_version")" || {
+  funcreturn "$(dirname "$(_nvm which "$node_version")")" || {
     ERROR "failed to capture installed node binary path"
     WARN "falling back on /usr/local/bin/node"
-    funcreturn "/usr/local/bin/node"
+    funcreturn "/usr/local/bin"
   }
 }
 
@@ -73,10 +73,10 @@ _n_install_node() {
     FATAL "failed to install $node_version using n"
     exit 1
   fi
-  funcreturn "$(n which "$node_version")" || {
+  funcreturn "$(dirnane "$(n which "$node_version")")" || {
     ERROR "failed to capture installed node binary path"
     WARN "falling back on /usr/local/bin/node"
-    funcreturn "/usr/local/bin/node"
+    funcreturn "/usr/local/bin"
   }
 }
 
@@ -127,7 +127,7 @@ _manual_install_node() {
   _append_to_shellrc "$new_path"
   export PATH="$new_path:$PATH"
 
-  funcreturn "${new_path}/bin/node"
+  funcreturn "${new_path}/bin"
 }
 
 # change usage of globals

@@ -27,6 +27,7 @@ _install_m() {
     FATAL "failed to install m. you can try using manual install method instead"
     exit 2
   }
+  SUCCESS "successfully installed mongodb version manager (m)"
 }
 
 _m_install_mongodb() {
@@ -139,10 +140,14 @@ install_mongodb() {
     case "$_opt" in
       m)
         m=1
-            ;;
+
+        _debug "m"
+                   ;;
       v)
         mongodb_version="$OPTARG"
-                                  ;;
+
+        _debug "mongodb_version"
+                                 ;;
       *) ERROR "unknown option" ;;
     esac
   done
@@ -150,12 +155,13 @@ install_mongodb() {
   if ((m)); then
     INFO "using m for mongodb"
     _install_m
-    _bin_path="$(funcrun _m_install_mongodb "$mongodb_version")"
+    mongodb_bin_path="$(funcrun _m_install_mongodb "$mongodb_version")"
   else
     INFO "manually installing mongodb"
-    _bin_path="$(funcrun _manual_install_mongodb "$mongodb_version")"
+    mognodb_bin_path="$(funcrun _manual_install_mongodb "$mongodb_version")"
   fi
+  _debug "mongodb_bin_path"
 
-  configure_mongodb "$_bin_path"
-  funcreturn "$_bin_path"
+  configure_mongodb "$mongodb_bin_path"
+  funcreturn "$mongodb_bin_path"
 }
