@@ -88,6 +88,7 @@ run_install() {
         shift 2
 
         install_mongodb_arg+="-v $mongo_version "
+        _debug "install_mongodb_arg"
 
         DEBUG "mongo_version: $mongo_version"
         DEBUG "MONGO_[MAJOR, MINOR, PATCH(IGNORED)]: ${mongod_version[*]}"
@@ -97,6 +98,7 @@ run_install() {
         shift
 
         install_mongodb_arg+="-m "
+        _debug "install_mongodb_arg"
 
         DEBUG "m: $m"
         ;;
