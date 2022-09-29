@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -o errexit -o pipefail
+
 # TODO: better way of handling errors than ERROR::{exit 1;}
 
 _source() {
