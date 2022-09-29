@@ -30,8 +30,7 @@ _debug() {
     _var_str="\$$_var_name"
   fi
   _var_value="$(eval echo -n "$_var_str")"
-  # B_LOG_print_message "${LOG_LEVEL_DEBUG}" "${_var_name}: ${_var_value}"
-  echo "${_var_name}: ${_var_value}"
+  B_LOG_print_message "${LOG_LEVEL_DEBUG}" "${_var_name}: ${_var_value}"
 }
 
 # @public
