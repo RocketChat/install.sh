@@ -181,7 +181,7 @@ run_install() {
     }
     INFO "installing mongodb version $mongo_version"
     _debug "install_mongodb_arg"
-    install_mongodb "$install_mongodb_arg"
+    install_mongodb $install_mongodb_arg
   else
     DEBUG "installing latest mongodb version for Rocket.Chat release $release"
     mongo_version="$(funcrun get_latest_supported_mongodb_version)"
