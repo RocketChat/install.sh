@@ -148,6 +148,8 @@ install_mongodb() {
     mongodb_version \
     _bin_path
 
+  echo "$@"
+
   while getopts "mv:" _opt; do
     case "$_opt" in
       m)
