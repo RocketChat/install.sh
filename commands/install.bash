@@ -73,6 +73,7 @@ run_install() {
         install_node_arg+=("-y")
 
         DEBUG "install_node $install_node"
+
         ;;
       --use-mongo)
         use_mongo=1
@@ -117,7 +118,7 @@ run_install() {
         n=1
         shift
 
-        install_node_arg+="-n "
+        install_node_arg+=("-n")
 
         DEBUG "n: $n"
         ;;
@@ -125,7 +126,7 @@ run_install() {
         nvm=1
         shift
 
-        install_node_arg+="-b "
+        install_node_arg+=("-b")
 
         DEBUG "nvm: $nvm"
         ;;
