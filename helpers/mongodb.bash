@@ -161,7 +161,7 @@ install_mongodb() {
     mongodb_bin_path="$(funcrun _m_install_mongodb "$mongodb_version")"
   else
     INFO "manually installing mongodb"
-    mognodb_bin_path="$(funcrun _manual_install_mongodb "$mongodb_version")"
+    mongodb_bin_path="$(funcrun _manual_install_mongodb "$mongodb_version")"
   fi
   _debug "mongodb_bin_path"
 
