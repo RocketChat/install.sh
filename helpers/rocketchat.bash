@@ -92,7 +92,7 @@ EOF
   EOF
 }
 
-insatll_rocketchat() {
+install_rocketchat() {
   # @description installs passed Rocket.Chat version
   # @exits on ERROR
   local \
