@@ -166,11 +166,12 @@ run_install() {
   elif [[ -n "$mongo_version" ]]; then
     DEBUG "mongo_version: $mongo_version"
     # mongo version was passed
-    is_mongodb_version_supported "$mongo_version" ||
+    is_mongodb_version_supported "$mongo_version" || {
       FATAL "mongodb version $mongo_version is not supported by Rocket.Chat version $release" \
         "either pass a supported version from ($(get_supported_mongodb_versions_str)) or" \
         "don't mention a mongodb version"
-    exit 2
+      exit 2
+    }
   else
     DEBUG "installing latest mongodb version for Rocket.Chat release $release"
     mongo_version="$(funcrun get_latest_supported_mongodb_version)"

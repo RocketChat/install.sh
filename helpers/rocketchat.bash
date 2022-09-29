@@ -45,7 +45,7 @@ is_mongodb_version_supported() {
   # @description is passed version part of compatibleMongoVersions?
   # @returns true | false
   local version="${1?mongodb version must be non-empty}"
-  jq > /dev/null -er '. | index('"$version"')' <<< "$COMPATIBLE_MONGODB_VERSIONS_JSON"
+  jq > /dev/null -er '. | index('\""$version"\"')' <<< "$COMPATIBLE_MONGODB_VERSIONS_JSON"
 }
 
 get_supported_mongodb_versions_str() {
