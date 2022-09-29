@@ -50,9 +50,10 @@ _m_install_mongodb() {
 }
 
 _deb_setup_repo() {
-  local key_url="https://www.mongodb.org/static/pgp/server-$MONGO_VERSION.asc"
-  local key_file="/usr/share/keyrings/mongodb-org-$MONGO_VERSION.gpg"
-  local repo_file="/etc/apt/sources.list.d/mongodb-org-$MONGO_VERSION.list"
+  local mongodb_version="${1?mongodb version required}"
+  local key_url="https://www.mongodb.org/static/pgp/server-$mongo_version.asc"
+  local key_file="/usr/share/keyrings/mongodb-org-$mongo_version.gpg"
+  local repo_file="/etc/apt/sources.list.d/mongodb-org-$mongo_version.list"
 
   DEBUG "key_url: $key_url"
   DEBUG "key_file: $key_file"
@@ -61,7 +62,7 @@ _deb_setup_repo() {
   declare -A repo=
   repo=([ubuntu]="multiverse" [debian]="main")
 
-  local repo_url="deb [ arch=amd64 signed-by=$key_file ] https://repo.mongodb.org/apt/$DISTRO $DISTRO_CODENAME/mongodb-org/$MONGO_VERSION ${repo[$DISTRO]}"
+  local repo_url="deb [ arch=amd64 signed-by=$key_file ] https://repo.mongodb.org/apt/$DISTRO $DISTRO_CODENAME/mongodb-org/$mongo_version ${repo[$DISTRO]}"
 
   DEBUG "repo_url: $repo_url"
 
@@ -73,11 +74,12 @@ _deb_setup_repo() {
 }
 
 _rpm_setup_repo() {
-  local yum_mongo_url="https://repo.mongodb.org/yum/redhat/$DISTRO_VERSION/mongodb-org/$MONGO_VERSION/x86_64/"
-  local yum_key="https://www.mongodb.org/static/pgp/server-$MONGO_VERSION.asc"
+  local mongodb_version="${1?mongodb version required}"
+  local yum_mongo_url="https://repo.mongodb.org/yum/redhat/$DISTRO_VERSION/mongodb-org/$mongo_version/x86_64/"
+  local yum_key="https://www.mongodb.org/static/pgp/server-$mongo_version.asc"
   INFO "saving repository data to file"
-  cat << EOF | sudo tee -a "/etc/yum.repos.d/mongodb-org-$MONGO_VERSION.repo"
-[mongodb-org-$MONGO_VERSION]
+  cat << EOF | sudo tee -a "/etc/yum.repos.d/mongodb-org-$mongo_version.repo"
+[mongodb-org-$mongo_version]
 name=MongoDB Repository
 baseurl=$yum_mongo_url
 gpgcheck=1
@@ -92,60 +94,22 @@ EOF
 _manual_install_mongodb() {
   # @returns install path
 
+  local mongodb_version="${1?mongodb version must be passed}"
+
   case "$DISTRO" in
     debian | ubuntu)
-      _deb_setup_repo
-                      ;;
+      _deb_setup_repo "$mongodb_version"
+                                         ;;
     centos)
-      _rpm_setup_repo
-                      ;;
+      _rpm_setup_repo "$mongodb_version"
+                                         ;;
   esac
 
-  local mongodb_version="${1?mongodb version must be passed}"
   install_pkg "mongodb-org" || {
     FATAL "failed to install mongodb version $mongodb_version; exiting ..."
     exit 2
   }
   funcreturn "$(dirname "$(which mongod)")"
-}
-
-configure_mongodb() {
-  # assume yq installed
-  local _bin_path="${1?mongodb binary path must be provided}"
-
-  function _mongo {
-    "${_bin_path%/}/mongo" "$@"
-  }
-
-  local replicaset_name="rs0"
-  yq -i e ".replication.replSetName = $replicaset_name" "/etc/mongod.conf" ||
-    ERROR "failed to edit mognodb config; following steps may fail as well"
-  if [[ $(systemctl is-active mongo) != "active" ]]; then
-    WARN "mongodb not running, starting now"
-    systemctl enable --now mongo > /dev/null || ERROR "failed to start up mongodb" \
-      "this may result in unexpected behaviour in Rocket.Chat startup"
-    SUCCESS "mongodb successfully started"
-  fi
-
-  local mongo_response_json=
-  if ! mongo_response_json="$(
-    _mongo --quiet --eval "printjson(rs.initiate({_id: '$replicaset_name', members: [{ _id: 0, host: 'localhost:27017' }]}))"
-  )"; then
-    FATAL "failed to initiate replicaset; Rocket.Chat won't work without replicaset enabled. exiting ..."
-    exit 3
-  fi
-
-  if ! (($(jq .ok -r <<< "$mongo_response_json"))); then
-    ERROR "$(jq .err -r <<< "$mongo_response_json")"
-    FATAL "failed to initiate replicaset; Rocket.Chat won't work without replicaset enabled"
-    exit 3
-  fi
-
-  export MONGO_URL="mongodb://localhost:27017/rocketchat?replicaSet=$replicaset_name"
-  export MONGO_OPLOG_URL="mongodb://localhost:27017/local?replicaSet=$replicaset_name"
-  DEBUG "MONGO_URL: $MONGO_URL"
-  DEBUG "MONGO_OPLOG_URL: $MONGO_OPLOG_URL"
-  SUCCESS "mongodb successfully configured"
 }
 
 install_mongodb() {

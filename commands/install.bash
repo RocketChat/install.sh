@@ -27,13 +27,16 @@ run_install() {
   local rocketchat_directory=
 
   local node_version_required=
-  local node_path=
 
   local release_info_endpoint=
   local release_info_json=
 
   local install_node_arg=()
   local install_mongodb_arg=()
+
+
+  local node_path=
+  local mongodb_path=
   while [[ -n "$1" ]]; do
     case "$1" in
       --root-url)
@@ -140,15 +143,15 @@ run_install() {
   verify_release "${release:-latest}"
 
   # shellcheck disable=2155
-  local node_version_required="$(funcrun get_required_node_version)"
+  node_version_required="$(funcrun get_required_node_version)"
   DEBUG "node_version_required: $node_version_required"
 
   install_node_arg+=("-v" "$node_version_required")
 
   _debug "install_node_arg"
   # shellcheck disable=2155
-  local node_bin_path="$(funcrun install_node "${install_node_arg[@]}")"
-  DEBUG "node_bin_path: $node_bin_path"
+  node_path="$(funcrun install_node "${install_node_arg[@]}")"
+  _debug "node_path"
 
   if command_exists "mongod"; then
 
@@ -184,15 +187,18 @@ run_install() {
     }
     INFO "installing mongodb version $mongo_version"
     _debug "install_mongodb_arg"
-    install_mongodb "${install_mongodb_arg[@]}"
+    mongodb_path="$(funcrun install_mongodb "${install_mongodb_arg[@]}")"
   else
     DEBUG "installing latest mongodb version for Rocket.Chat release $release"
     mongo_version="$(funcrun get_latest_supported_mongodb_version)"
     DEBUG "mongo_version: $mongo_version"
     _debug "install_mongodb_arg"
-    install_mongodb "${install_mongodb_arg[@]}"
+    mongodb_path="$(funcrun install_mongodb "${install_mongodb_arg[@]}")"
   fi
 
   # we have node and mongodb installed at this point
   install_rocketchat "$release"
+
+  # confugure_mongodb
+  # confugure_rocketchat
 }

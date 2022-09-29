@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -o errexit -o pipefail
+set +m
 
 # TODO: better way of handling errors than ERROR::{exit 1;}
 
