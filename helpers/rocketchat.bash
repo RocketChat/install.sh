@@ -24,7 +24,7 @@ verify_release() {
     exit 2
   fi
   local compatible_mongodb_versions=
-  compatible_mongodb_versions="$(jq '.compatibleMongoVersions // empty' -r <<< "$RELEASE_INFO_JSON")"
+  compatible_mongodb_versions="$(jq '.compatibleMongoVersions // empty' -c <<< "$RELEASE_INFO_JSON")"
   [[ -z "$compatible_mongodb_versions" ]] && WARN "i can't detect the supported mongodb versions for the version you selected." \
     "this means you're trying to install a very old version of Rocket.Chat, which is not recommended." \
     "please install a newer version of, check https://github.com/RocketChat/Rocket.Chat/releases for more information." \
