@@ -32,8 +32,9 @@ _install_m() {
 
 _m_install_mongodb() {
   # @returns install path
-  m "$MONGO_VERSION" || {
-    FATAL "failed to install mongodb version $MONGO_VERSION; exiting ..."
+  local mongodb_version="${1?mongodb version must be passed}"
+  m "$mongodb_version" || {
+    FATAL "failed to install mongodb version $mongodb_version; exiting ..."
     exit 2
   }
   funcreturn "$HOME/.local/bin"
@@ -81,8 +82,10 @@ EOF
 
 _manual_install_mongodb() {
   # @returns install path
+
+  local mongodb_version="${1?mongodb version must be passed}"
   install_pkg "mongodb-org" || {
-    FATAL "failed to install mongodb version $MONGO_VERSION; exiting ..."
+    FATAL "failed to install mongodb version $mongodb_version; exiting ..."
     exit 2
   }
   funcreturn "$(dirname "$(which mongod)")"
