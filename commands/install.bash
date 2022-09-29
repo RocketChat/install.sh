@@ -172,6 +172,8 @@ run_install() {
         "don't mention a mongodb version"
       exit 2
     }
+    INFO "installing mongodb version $mongo_version"
+    install_mongodb "$mongo_version"
   else
     DEBUG "installing latest mongodb version for Rocket.Chat release $release"
     mongo_version="$(funcrun get_latest_supported_mongodb_version)"
