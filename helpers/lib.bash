@@ -21,7 +21,7 @@ _debug() {
     _var_name \
     _var_value
   _var_name="${1?variable name must be passed}"
-  _var_value="$(eval printf "\$\"$_var_name\"")"
+  _var_value="$(eval printf "%s" \$"$_var_name")"
   B_LOG_print_message "${LOG_LEVEL_DEBUG}" "${_var_name}: ${_var_value}"
 }
 
