@@ -22,6 +22,7 @@ handle_arguments() {
                 ;;
     "install")
       is_host_supported
+      shift
       run_install "$@"
                        ;;
     "check-update" | "check-updates") ;;
