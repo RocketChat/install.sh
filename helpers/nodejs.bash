@@ -73,7 +73,7 @@ _n_install_node() {
     FATAL "failed to install $node_version using n"
     exit 1
   fi
-  funcreturn "$(dirnane "$(n which "$node_version")")" || {
+  funcreturn "$(dirname "$(n which "$node_version")")" || {
     ERROR "failed to capture installed node binary path"
     WARN "falling back on /usr/local/bin/node"
     funcreturn "/usr/local/bin"
