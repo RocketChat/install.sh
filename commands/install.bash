@@ -144,7 +144,7 @@ run_install() {
 
   _debug "install_node_arg"
   # shellcheck disable=2155
-  local node_bin_path="$(funcrun install_node -v "$node_version_required" "$install_node_arg")"
+  local node_bin_path="$(funcrun install_node -v "$node_version_required" "${install_node_arg[@]}")"
   DEBUG "node_bin_path: $node_bin_path"
 
   if command_exists "mongod"; then
@@ -181,13 +181,13 @@ run_install() {
     }
     INFO "installing mongodb version $mongo_version"
     _debug "install_mongodb_arg"
-    install_mongodb $install_mongodb_arg
+    install_mongodb "${install_mongodb_arg[@]}"
   else
     DEBUG "installing latest mongodb version for Rocket.Chat release $release"
     mongo_version="$(funcrun get_latest_supported_mongodb_version)"
     DEBUG "mongo_version: $mongo_version"
     _debug "install_mongodb_arg"
-    install_mongodb "$install_mongodb_arg"
+    install_mongodb "${install_mongodb_arg[@]}"
   fi
 
   # we have node and mongodb installed at this point
