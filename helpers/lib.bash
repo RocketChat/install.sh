@@ -4,7 +4,7 @@ _source "messages/en.bash"
 
 {
   # shellcheck disable=2155
-  if declare -g __func_returns="$(mktemp -t rocketchatctl__func_returns)"; then
+  if ! declare -g __func_returns="$(mktemp -t rocketchatctl__func_returnsXXXXXXXXXX)"; then
     FATAL "failed to pipe function output"
     exit 10
   fi

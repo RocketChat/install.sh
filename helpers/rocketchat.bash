@@ -45,7 +45,7 @@ is_mongodb_version_supported() {
   # @description is passed version part of compatibleMongoVersions?
   # @returns true | false
   local version="${1?mongodb version must be non-empty}"
-  jq > /dev/null -er '. | index('"$version"')'
+  jq > /dev/null -er '. | index('"$version"')' <<< "$COMPATIBLE_MONGODB_VERSIONS_JSON"
 }
 
 get_supported_mongodb_versions_str() {
@@ -56,6 +56,40 @@ get_supported_mongodb_versions_str() {
 get_latest_supported_mongodb_version() {
   # @nofuncrun
   jq 'sort_by(.) | reverse | .[0]' -r <<< "$COMPATIBLE_MONGODB_VERSIONS_JSON"
+}
+
+configure_rocketchat() {
+  # @exits on error
+  INFO "creating rocketchat system user for background service"
+  if ! { sudo useradd -M rocketchat && sudo usermod -L rocketchat; }; then
+    WARN "failed to create user rocketchat"
+    INFO "this isn't a critical error, falling back to root owned process" \
+      "although you should take care of it. use 'rocketchatctl doctor' to make an attempt at fixing"
+  else
+    # FIXME
+    sudo chown -R rocketchat:rocketchat /
+  fi
+  cat << EOF | sudo > /dev/null tee /lib/systemd/system/rocketchat.service
+[Unit]
+Description=The Rocket.Chat server
+After=network.target remote-fs.target nss-lookup.target mongod.service
+[Service]
+ExecStart=$NODE_BIN /opt/Rocket.Chat/main.js
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=rocketchat
+User=$(grep -Eq ^rocketchat /etc/passwd && printf "rocketchat" || printf "root")
+Environment=MONGO_URL=$MONGO_URL
+Environment=MONGO_OPLOG_URL=$MONGO_OPLOG_URL
+Environment=ROOT_URL=$ROOT_URL
+Environment=PORT=$PORT
+Environment=BIND_IP=$BIND_IP
+Environment=DEPLOY_PLATFORM=rocketchatctl
+Environment=REG_TOKEN=$REG_TOKEN
+[Install]
+WantedBy=multi-user.target
+EOF
+  EOF
 }
 
 insatll_rocketchat() {
