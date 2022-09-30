@@ -58,9 +58,9 @@ is_dir_accessible() {
   uid="$(id -u)"
   gid="$(id -g)"
 
-  dir_owner_uid="$(stat -f "%u" "$dir")"
-  dir_owner_gid="$(stat -f "%g" "$dir")"
-  dir_perm_oct="$(stat -f "%Lp" "$dir")"
+  dir_owner_uid="$(stat --format "%u" "$dir")"
+  dir_owner_gid="$(stat --format "%g" "$dir")"
+  dir_perm_oct="$(stat --format "%Lp" "$dir")"
 
   if {
     ((uid == dir_owner_uid))   && (((dir_perm_oct / 100) == 7))
