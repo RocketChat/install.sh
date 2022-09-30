@@ -130,7 +130,7 @@ install_rocketchat() {
   $run_cmd mkdir "$where"
 
   INFO "downloading Rocket.Chat"
-  if ! $run_cmd curl -fsSLo "$archive_file" "https://releases.rocket.chat/$release/download" --retry; then
+  if ! $run_cmd curl -fsSLo "$archive_file" "https://releases.rocket.chat/$release/download"; then
     FATAL "failed to download rocketchat archive; exiting..."
     exit 5
   fi
@@ -144,7 +144,7 @@ install_rocketchat() {
   INFO "installing nodejs modules"
   npm i --production ||
     ERROR "failed to install all nodejs modules; Rocket.Chat may not work as expected"
-}
+
 
 configure_mongodb() {
   echo
