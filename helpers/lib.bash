@@ -80,3 +80,19 @@ is_dir_accessible() {
   return $((((dir_perm_oct % 100) % 10) != 7))
 }
 
+path_join() {
+  local \
+    left \
+    right
+
+  left="${1?path required}"
+  right="${2?path required}"
+
+  printf "%s/%s" "${left%/}" "$right"
+}
+
+path_environment_append() {
+  local _path="$1"
+  [[ -z "$_path" ]] && return
+  [[ "$PATH" == ?(*:)"$_path"?(:*) ]] || export PATH="$_path:$PATH"
+}

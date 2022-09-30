@@ -43,31 +43,31 @@ run_install() {
         shift 2
 
         DEBUG "root_url: $root_url"
-        ;;
+                                    ;;
       --port)
         port="$2"
         shift 2
 
         DEBUG "port: $port"
-        ;;
+                            ;;
       --webserver)
         webserver="$2"
         shift 2
 
         DEBUG "webserver: $webserver"
-        ;;
+                                      ;;
       --letsencrypt-email)
         letsencrypt_email="$2"
         shift 2
 
         DEBUG "letsencrypt_email: $letsencrypt_email"
-        ;;
+                                                      ;;
       --version | --release)
         release="$2"
         shift 2
 
         DEBUG "release: $release"
-        ;;
+                                  ;;
       --install-node)
         install_node=1
         shift
@@ -75,14 +75,13 @@ run_install() {
         install_node_arg+=("-y")
 
         DEBUG "install_node $install_node"
-
-        ;;
+                                           ;;
       --use-mongo)
         use_mongo=1
         shift
 
         DEBUG "use_mongo: $use_mongo"
-        ;;
+                                      ;;
       --mongo-version)
         # shellcheck disable=SC2206
         local mongod_version=(${2//./ })
@@ -94,7 +93,7 @@ run_install() {
 
         DEBUG "mongo_version: $mongo_version"
         DEBUG "MONGO_[MAJOR, MINOR, PATCH(IGNORED)]: ${mongod_version[*]}"
-        ;;
+                                                                           ;;
       --use-m)
         m=1
         shift
@@ -102,20 +101,20 @@ run_install() {
         install_mongodb_arg+=("-m")
 
         DEBUG "m: $m"
-        ;;
+                      ;;
       --bind-loopback)
         # TODO: default set this to true if webserver != none
         bind_loopback=1
         shift
 
         DEBUG "bind_loopback: $bind_loopback"
-        ;;
+                                              ;;
       --reg-token)
         reg_token="$2"
         shift 2
 
         DBEUG "reg_token: ${reg_token+*****}"
-        ;;
+                                              ;;
       --use-n)
         n=1
         shift
@@ -123,7 +122,7 @@ run_install() {
         install_node_arg+=("-n")
 
         DEBUG "n: $n"
-        ;;
+                      ;;
       --use-nvm)
         nvm=1
         shift
@@ -131,10 +130,15 @@ run_install() {
         install_node_arg+=("-b")
 
         DEBUG "nvm: $nvm"
-        ;;
+                          ;;
+
+      --dir)
+        rocketchat_directory="$2"
+        _debug "rocketchat_directory"
+                                    ;;
       *)
         print_unknown_command_argument
-        ;;
+                                       ;;
     esac
   done
 
@@ -207,9 +211,17 @@ run_install() {
   mongodb_path="$(background_read "mongodb")"
   _debug "mongodb_path"
 
-  # we have node and mongodb installed at this point
-  # TODO use arg for where
-  install_rocketchat -v "$release" -w "/opt/Rocket.Chat"
+  configure_mongodb_for_rocketchat -p "$mongodb_path" -r "rs0"
+  install_rocketchat -v "$release" -w "${rocketchat_directory:=/opt/Rocket.Chat}" -n "$node_path"
+  configure_rocketchat \
+    -u "rocketchat" \
+    -d "rocketchat" \
+    -p "${port:=3000}" \
+    -r "${root_url:=http://localhost:3000}" \
+    -n "$(path_join "$node_path" node)" \
+    -e "${reg_token}" \
+    -s "rs0" \
+    -w "$rocketchat_directory"
 
   # confugure_mongodb
   # confugure_rocketchat

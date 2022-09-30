@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -o errexit -o pipefail
+shopt -s extglob
 
 # TODO: better way of handling errors than ERROR::{exit 1;}
 
@@ -24,8 +25,8 @@ handle_arguments() {
          exit 0
                 ;;
     "install")
-      is_host_supported
       shift
+      is_host_supported
       run_install "$@"
                        ;;
     "check-update" | "check-updates") ;;
@@ -64,6 +65,6 @@ SUCCESS() {
   B_LOG_print_message 250 "${*?message required}"
 }
 
-concurrency_init -p "rocketchatctl"
+concurrency_init -p "$(basename "$0")"
 
 entrypoint "$@"

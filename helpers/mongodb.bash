@@ -23,31 +23,43 @@ is_mongod_ready() {
 
 _install_m() {
   # @returns m path
-  local m_dir="$HOME/.local/bin"
+  local \
+    m_dir \
+    m_bin
+  m_dir="$HOME/.local/bin"
   [[ -d "$m_dir" ]] || mkdir "$m_dir" -p
-  grep -Eq "(^$m_dir|[^:]:{1}$m_dir):" <<< "$PATH" || export PATH="$m_dir:$PATH"
-  curl -Lo "$m_dir"/m "$M_BIN_URL" --fail || {
+  m_bin="$(path_join "$m_dir" m)"
+  curl -fsSLo "$m_bin" "$M_BIN_URL" --fail || {
     FATAL "failed to install m. you can try using manual install method instead"
     exit 2
   }
-  chmod u+x "$m_dir"/m
+  chmod u+x "$m_bin"
   SUCCESS "successfully installed mongodb version manager (m)"
+  funcreturn "$m_bin"
 }
 
 _m_install_mongodb() {
   # @returns install path
 
-  local mongodb_version="${1?mongodb version must be passed}"
+  local \
+    mongodb_version \
+    m_bin
+  mongodb_version="${1?mongodb version must be passed}"
 
-  _install_m
+  m_bin="$(funcrun _install_m)"
+  _debug "m_bin"
 
-  m "$mongodb_version" || {
+  function _m() {
+    "$m_bin" "$@"
+  }
+
+  _m "$mongodb_version" || {
     FATAL "failed to install mongodb version $mongodb_version; exiting ..."
     exit 2
   }
 
   # m returns path without binary name appended
-  funcreturn "$(m which "$mongodb_version")"
+  funcreturn "$(_m which "$mongodb_version")"
 }
 
 _deb_setup_repo() {
@@ -119,8 +131,7 @@ install_mongodb() {
     OPTARG \
     _opt \
     m \
-    mongodb_version \
-    _bin_path
+    mongodb_version
 
   while getopts "mv:" _opt; do
     case "$_opt" in

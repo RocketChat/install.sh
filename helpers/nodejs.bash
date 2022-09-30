@@ -34,7 +34,7 @@ _install_nvm() {
     export NVM_DIR="$HOME/.nvm"
   fi
   _debug "NVM_DIR"
-  if ! curl -so- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash; then
+  if ! curl -fSLso- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash; then
     FATAL "failed to install nvm; halting installation"
     exit 1
   fi
