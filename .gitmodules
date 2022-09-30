@@ -1,3 +1,6 @@
 [submodule "b-log"]
 	path = b-log
 	url = https://github.com/debdutdeb/b-log.git
+[submodule "bash_concurrent"]
+	path = bash_concurrent
+	url = https://github.com/debdutdeb/bash_concurrent.git

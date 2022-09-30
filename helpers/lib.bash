@@ -2,9 +2,7 @@
 
 _source "messages/en.bash"
 _source "b-log/b-log.sh"
-
-# TODO remove this
-_source "helpers/functools.bash"
+_source "bash_concurrent/multiprocess.bash"
 
 _debug() {
   # @description helper for variable debug messages

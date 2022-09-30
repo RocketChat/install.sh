@@ -51,9 +51,9 @@ _m_install_mongodb() {
 
 _deb_setup_repo() {
   local mongodb_version="${1?mongodb version required}"
-  local key_url="https://www.mongodb.org/static/pgp/server-$mongo_version.asc"
-  local key_file="/usr/share/keyrings/mongodb-org-$mongo_version.gpg"
-  local repo_file="/etc/apt/sources.list.d/mongodb-org-$mongo_version.list"
+  local key_url="https://www.mongodb.org/static/pgp/server-$mongodb_version.asc"
+  local key_file="/usr/share/keyrings/mongodb-org-$mongodb_version.gpg"
+  local repo_file="/etc/apt/sources.list.d/mongodb-org-$mongodb_version.list"
 
   DEBUG "key_url: $key_url"
   DEBUG "key_file: $key_file"
@@ -62,7 +62,7 @@ _deb_setup_repo() {
   declare -A repo=
   repo=([ubuntu]="multiverse" [debian]="main")
 
-  local repo_url="deb [ arch=amd64 signed-by=$key_file ] https://repo.mongodb.org/apt/$DISTRO $DISTRO_CODENAME/mongodb-org/$mongo_version ${repo[$DISTRO]}"
+  local repo_url="deb [ arch=amd64 signed-by=$key_file ] https://repo.mongodb.org/apt/$DISTRO $DISTRO_CODENAME/mongodb-org/$mongodb_version ${repo[$DISTRO]}"
 
   DEBUG "repo_url: $repo_url"
 
@@ -75,11 +75,11 @@ _deb_setup_repo() {
 
 _rpm_setup_repo() {
   local mongodb_version="${1?mongodb version required}"
-  local yum_mongo_url="https://repo.mongodb.org/yum/redhat/$DISTRO_VERSION/mongodb-org/$mongo_version/x86_64/"
-  local yum_key="https://www.mongodb.org/static/pgp/server-$mongo_version.asc"
+  local yum_mongo_url="https://repo.mongodb.org/yum/redhat/$DISTRO_VERSION/mongodb-org/$mongodb_version/x86_64/"
+  local yum_key="https://www.mongodb.org/static/pgp/server-$mongodb_version.asc"
   INFO "saving repository data to file"
-  cat << EOF | sudo tee -a "/etc/yum.repos.d/mongodb-org-$mongo_version.repo"
-[mongodb-org-$mongo_version]
+  cat << EOF | sudo tee -a "/etc/yum.repos.d/mongodb-org-$mongodb_version.repo"
+[mongodb-org-$mongodb_version]
 name=MongoDB Repository
 baseurl=$yum_mongo_url
 gpgcheck=1

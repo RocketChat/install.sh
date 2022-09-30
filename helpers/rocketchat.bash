@@ -36,9 +36,7 @@ verify_release() {
 get_required_node_version() {
   # @description parse release_info_json to get the required nodejs version
   # @returns required nodejs version for current rocketchat version
-  local node_required_version=
-  node_required_version="$(jq '.nodeVersion // "12.22.9"' -r <<< "$RELEASE_INFO_JSON")"
-  funcreturn "$node_required_version"
+  funcreturn "$(jq '.nodeVersion // "12.22.9"' -r <<< "$RELEASE_INFO_JSON")"
 }
 
 is_mongodb_version_supported() {
@@ -55,7 +53,7 @@ get_supported_mongodb_versions_str() {
 
 get_latest_supported_mongodb_version() {
   # @nofuncrun
-  jq 'sort_by(.) | reverse | .[0]' -r <<< "$COMPATIBLE_MONGODB_VERSIONS_JSON"
+  funcreturn "$(jq 'sort_by(.) | reverse | .[0]' -r <<< "$COMPATIBLE_MONGODB_VERSIONS_JSON")"
 }
 
 configure_rocketchat() {
@@ -132,7 +130,7 @@ install_rocketchat() {
   $run_cmd mkdir "$where"
 
   INFO "downloading Rocket.Chat"
-  if ! $run_cmd curl -Lo "$archive_file" "https://releases.rocket.chat/$release/download" --retry; then
+  if ! $run_cmd curl -fsSLo "$archive_file" "https://releases.rocket.chat/$release/download" --retry; then
     FATAL "failed to download rocketchat archive; exiting..."
     exit 5
   fi
