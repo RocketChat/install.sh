@@ -144,7 +144,7 @@ install_rocketchat() {
   INFO "installing nodejs modules"
   npm i --production ||
     ERROR "failed to install all nodejs modules; Rocket.Chat may not work as expected"
-
+}
 
 configure_mongodb() {
   echo
