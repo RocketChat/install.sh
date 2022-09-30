@@ -147,7 +147,7 @@ run_install() {
 
   function setup_node() {
     # shellcheck disable=2064
-    trap "kill -2 $$" EXIT
+    trap 'kill -2 $$' EXIT
 
     # shellcheck disable=2155
     node_version_required="$(funcrun get_required_node_version)"
