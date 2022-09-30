@@ -141,59 +141,71 @@ run_install() {
   # shellcheck disable=2155
   verify_release "${release:-latest}"
 
-  # shellcheck disable=2155
-  node_version_required="$(funcrun get_required_node_version)"
-  DEBUG "node_version_required: $node_version_required"
+  function setup_node() {
+    # shellcheck disable=2155
+    node_version_required="$(funcrun get_required_node_version)"
+    DEBUG "node_version_required: $node_version_required"
 
-  install_node_arg+=("-v" "$node_version_required")
+    install_node_arg+=("-v" "$node_version_required")
 
-  _debug "install_node_arg"
-  # shellcheck disable=2155
-  node_path="$(funcrun install_node "${install_node_arg[@]}")"
-  _debug "node_path"
+    _debug "install_node_arg"
+    # shellcheck disable=2155
+    node_path="$(funcrun install_node "${install_node_arg[@]}")"
+    _debug "node_path"
+  }
 
-  if command_exists "mongod"; then
+  function setup_mongodb() {
+    if command_exists "mongod"; then
 
-    INFO "detecting existing mongodb installation"
+      INFO "detecting existing mongodb installation"
 
-    is_mongod_ready || {
-      FATAL "failed to connect to mongodb; required to check configuration" \
-        "please make sure installed mongodb server is running before runnning this script"
-      exit 2
-    }
-
-    local local_mongod_version="$(funcrun get_current_mongodb_version)"
-    if is_mongodb_version_supported "$local_mongod_version"; then
-      if ! ((use_mongo)); then
-        FATAL "installed mongodb version isn't supported." \
-          " supported versions are $(get_supported_mongodb_versions_str)." \
-          " use --use-mongo option to ignore this"
+      is_mongod_ready || {
+        FATAL "failed to connect to mongodb; required to check configuration" \
+          "please make sure installed mongodb server is running before runnning this script"
         exit 2
+      }
+
+      local local_mongod_version="$(funcrun get_current_mongodb_version)"
+      if is_mongodb_version_supported "$local_mongod_version"; then
+        if ! ((use_mongo)); then
+          FATAL "installed mongodb version isn't supported." \
+            " supported versions are $(get_supported_mongodb_versions_str)." \
+            " use --use-mongo option to ignore this"
+          exit 2
+        fi
+        WARN "your installed version isn't supported; Rocket.Chat may not work as expected"
+        WARN "supported versions are $(funcrun get_supported_mongodb_versions_str)."
       fi
-      WARN "your installed version isn't supported; Rocket.Chat may not work as expected"
-      WARN "supported versions are $(funcrun get_supported_mongodb_versions_str)."
+      # TODO decide if this needs to be a FATAL error
+      is_storage_engine_wiredTiger || WARN "you are currently not using wiredTiger storage engine."
+    elif [[ -n "$mongo_version" ]]; then
+      DEBUG "mongo_version: $mongo_version"
+      # mongo version was passed
+      is_mongodb_version_supported "$mongo_version" || {
+        FATAL "mongodb version $mongo_version is not supported by Rocket.Chat version $release" \
+          "either pass a supported version from ($(get_supported_mongodb_versions_str)) or" \
+          "don't mention a mongodb version"
+        exit 2
+      }
+      INFO "installing mongodb version $mongo_version"
+      _debug "install_mongodb_arg"
+      mongodb_path="$(funcrun install_mongodb "${install_mongodb_arg[@]}")"
+    else
+      DEBUG "installing latest mongodb version for Rocket.Chat release $release"
+      mongo_version="$(funcrun get_latest_supported_mongodb_version)"
+      DEBUG "mongo_version: $mongo_version"
+      _debug "install_mongodb_arg"
+      mongodb_path="$(funcrun install_mongodb "${install_mongodb_arg[@]}" -v "$mongo_version")"
     fi
-    # TODO decide if this needs to be a FATAL error
-    is_storage_engine_wiredTiger || WARN "you are currently not using wiredTiger storage engine."
-  elif [[ -n "$mongo_version" ]]; then
-    DEBUG "mongo_version: $mongo_version"
-    # mongo version was passed
-    is_mongodb_version_supported "$mongo_version" || {
-      FATAL "mongodb version $mongo_version is not supported by Rocket.Chat version $release" \
-        "either pass a supported version from ($(get_supported_mongodb_versions_str)) or" \
-        "don't mention a mongodb version"
-      exit 2
-    }
-    INFO "installing mongodb version $mongo_version"
-    _debug "install_mongodb_arg"
-    mongodb_path="$(funcrun install_mongodb "${install_mongodb_arg[@]}")"
-  else
-    DEBUG "installing latest mongodb version for Rocket.Chat release $release"
-    mongo_version="$(funcrun get_latest_supported_mongodb_version)"
-    DEBUG "mongo_version: $mongo_version"
-    _debug "install_mongodb_arg"
-    mongodb_path="$(funcrun install_mongodb "${install_mongodb_arg[@]}" -v "$mongo_version")"
-  fi
+  }
+
+  background_execute -j "node" setup_node
+  background_execute -j "mongodb" setup_mongodb
+
+  node_path="$(background_read "node")"
+  _debug "node_path"
+  mongodb_path="$(background_read "mongodb")"
+  _debug "mongodb_path"
 
   # we have node and mongodb installed at this point
   install_rocketchat "$release"
