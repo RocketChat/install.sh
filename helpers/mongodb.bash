@@ -24,7 +24,7 @@ is_mongod_ready() {
 _install_m() {
   # @returns m path
   local m_dir="$HOME/.local/bin"
-  [[ -d "$m_dir" ]] || mkdir "$m_dir"
+  [[ -d "$m_dir" ]] || mkdir "$m_dir" -p
   grep -Eq "(^$m_dir|[^:]:{1}$m_dir):" <<< "$PATH" || export PATH="$m_dir:$PATH"
   curl -Lo "$m_dir"/m "$M_BIN_URL" --fail || {
     FATAL "failed to install m. you can try using manual install method instead"

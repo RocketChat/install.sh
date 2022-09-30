@@ -65,6 +65,6 @@ SUCCESS() {
   B_LOG_print_message 250 "${*?message required}"
 }
 
-concurrency_init "rocketchatctl"
+concurrency_init -p "rocketchatctl"
 
 entrypoint "$@"
