@@ -208,7 +208,8 @@ run_install() {
   _debug "mongodb_path"
 
   # we have node and mongodb installed at this point
-  install_rocketchat "$release"
+  # TODO use arg for where
+  install_rocketchat -v "$release" -w "/opt/Rocket.Chat"
 
   # confugure_mongodb
   # confugure_rocketchat
