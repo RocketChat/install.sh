@@ -145,6 +145,9 @@ run_install() {
   # shellcheck disable=2155
   verify_release "${release:-latest}"
 
+  # exit if any of the child fails
+  trap "exit 2" 2
+
   function setup_node() {
     # shellcheck disable=2064
     trap 'kill -2 $$' EXIT
@@ -162,6 +165,9 @@ run_install() {
   }
 
   function setup_mongodb() {
+    # shellcheck disable=2064
+    trap 'kill -2 $$' EXIT
+
     if command_exists "mongod"; then
 
       INFO "detecting existing mongodb installation"
