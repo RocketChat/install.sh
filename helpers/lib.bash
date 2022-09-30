@@ -2,7 +2,6 @@
 
 _source "messages/en.bash"
 _source "b-log/b-log.sh"
-_source "bash_concurrent/multiprocess.bash"
 
 _debug() {
   # @description helper for variable debug messages

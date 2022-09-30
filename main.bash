@@ -16,6 +16,7 @@ _source "commands/install.bash"
 _source "helpers/host.bash"
 _source "helpers/lib.bash"
 _source "b-log/b-log.sh"
+_source "bash_concurrent/multiprocess.bash"
 
 handle_arguments() {
   case "$1" in
@@ -63,5 +64,7 @@ SUCCESS() {
   # i want FUNCNAME to be just right
   B_LOG_print_message 250 "${*?message required}"
 }
+
+concurrency_init "rocketchatctl"
 
 entrypoint "$@"
