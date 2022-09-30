@@ -60,9 +60,9 @@ is_dir_accessible() {
   gid="$(id -g)"
   _debug "gid"
 
-  dir_owner_uid="$(stat --format "%u" "$dir")"
-  dir_owner_gid="$(stat --format "%g" "$dir")"
-  dir_perm_oct="$(stat --format "%Lp" "$dir")"
+  dir_owner_uid="$(stat -c "%u" "$dir")"
+  dir_owner_gid="$(stat -c "%g" "$dir")"
+  dir_perm_oct="$(stat -c "%a" "$dir")"
   _debug "dir_owner_uid"
   _debug "dir_owner_gid"
   _debug "dir_perm_oct"
