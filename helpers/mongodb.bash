@@ -30,6 +30,7 @@ _install_m() {
     FATAL "failed to install m. you can try using manual install method instead"
     exit 2
   }
+  chmod u+x "$m_dir"/m
   SUCCESS "successfully installed mongodb version manager (m)"
 }
 
