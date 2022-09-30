@@ -42,27 +42,25 @@ check_centos() {
 is_host_supported() {
   INFO "checking if host is supported or not"
   declare -A host_check=(
-        [ubuntu]=check_ubuntu
-        [centos]=check_centos
-        [debian]=check_debian
+         [ubuntu]=check_ubuntu
+         [centos]=check_centos
+         [debian]=check_debian
   )
   is "$DISTRO" in host_check || print_distro_not_supported_error_and_exit "$DISTRO"
   SUCCESS "detected host ($DISTRO) is supported"
   eval "${host_check[$DISTRO]}"
 }
 
-install_pkg() {
+pkm() {
   # TODO refactor?
   local cmd=
   case "$DISTRO" in
     debian | ubuntu)
-      cmd="apt install -y"
-      ;;
+      cmd="apt"
+                ;;
     centos)
-      local _cmd=
-      command_exists "dnf" && _cmd="dnf" || _cmd="yum"
-      cmd="$_cmd install -y"
-      ;;
+      command_exists "dnf" && cmd="dnf" || cmd="yum"
+                                                     ;;
   esac
   DEBUG "using install_command \"$cmd\""
   $cmd "$@"
