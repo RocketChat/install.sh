@@ -181,6 +181,7 @@ install_node() {
 
   if ((node_exists)) && node -e "process.exit(process.version === 'v${node_version}' ? 0 : 1)"; then
     SUCCESS "node version satisfied"
+    funcreturn "$(dirname "$(which node)")"
     return
   fi
 

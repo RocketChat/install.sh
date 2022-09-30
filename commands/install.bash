@@ -146,6 +146,9 @@ run_install() {
   verify_release "${release:-latest}"
 
   function setup_node() {
+    # shellcheck disable=2064
+    trap "kill -2 $$" EXIT
+
     # shellcheck disable=2155
     node_version_required="$(funcrun get_required_node_version)"
     DEBUG "node_version_required: $node_version_required"
