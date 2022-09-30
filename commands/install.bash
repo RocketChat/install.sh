@@ -34,7 +34,6 @@ run_install() {
   local install_node_arg=()
   local install_mongodb_arg=()
 
-
   local node_path=
   local mongodb_path=
   while [[ -n "$1" ]]; do
@@ -193,7 +192,7 @@ run_install() {
     mongo_version="$(funcrun get_latest_supported_mongodb_version)"
     DEBUG "mongo_version: $mongo_version"
     _debug "install_mongodb_arg"
-    mongodb_path="$(funcrun install_mongodb "${install_mongodb_arg[@]}")"
+    mongodb_path="$(funcrun install_mongodb "${install_mongodb_arg[@]}" -v "$mongo_version")"
   fi
 
   # we have node and mongodb installed at this point
