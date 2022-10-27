@@ -1196,7 +1196,6 @@ main() {
 
   local -r ROCKETCHATCTL_DOWNLOAD_URL="https://raw.githubusercontent.com/RocketChat/install.sh/master/rocketchatctl"
   local -r ROCKETCHATCTL_DIRECTORY="/usr/local/bin"
-  local -r ROCKETCHATCTL_TEMP_DIRECTORY="/tmp"
 
   local -r TRAEFIK_DOWNLOAD_URL="https://github.com/containous/traefik/releases/download/v1.7.20/traefik"
   local -r CADDY_DOWNLOAD_URL="https://github.com/mholt/caddy/releases/download/v1.0.0/caddy_v1.0.0_linux_amd64.tar.gz"
