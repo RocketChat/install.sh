@@ -136,7 +136,7 @@ install_node() {
 	else
 		local _node
 		if ((n)); then
-			if _node="$(dirname "$(n which "$node_version" 2> /dev/null)")"; then
+			if command_exists n && _node="$(dirname "$(n which "$node_version" 2> /dev/null)")"; then
 				path_environment_append "$_node"
 				node_exists=1
 			fi
@@ -144,7 +144,7 @@ install_node() {
 			local nvm_dir
 			{ [[ -f /opt/nvm/nvm.sh ]] && nvm_dir=/opt/nvm; } ||
 				{ [[ -f $HOME/.nvm/nvm.sh ]] && nvm_dir=$HOME/.nvm; }
-			if _node="$(dirname "$(BASH_ENV="$nvm_dir/nvm.sh" bash -c "nvm which $node_version 2>/dev/null")")"; then
+			if [[ -n "$nvm_dir" ]] && _node="$(dirname "$(BASH_ENV="$nvm_dir/nvm.sh" bash -c "nvm which $node_version" 2> /dev/null)")"; then
 				path_environment_append "$_node"
 				node_exists=1
 			fi
