@@ -45,7 +45,7 @@ _n_install_node() {
 	fi
 }
 
-_n_install_node() {
+_nvm_install_node() {
 	local node_version="${1?node version is required}"
 	if ! BASH_ENV="$NVM_DIR/nvm.sh" bash -c "nvm install $node_version" &> /dev/null; then
 		FATAL "failed to install $node_version using nvm"
