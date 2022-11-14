@@ -81,10 +81,11 @@ configure_mongodb_for_rocketchat() {
 	else
 		sudo systemctl restart mongod > /dev/null
 	fi
+	sleep 5
 	if ! mongo_response_json="$(
 		mongo --quiet --eval "printjson(rs.initiate({_id: '$replicaset_name', members: [{ _id: 0, host: 'localhost:27017' }]}))"
 	)"; then
-		ERROR "mongo_response_json: $mongo_response_json"
+		ERROR "$mongo_response_json"
 		FATAL "failed to initiate replicaset; Rocket.Chat won't work without replicaset enabled. exiting ..."
 		exit 1
 	fi
