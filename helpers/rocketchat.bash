@@ -71,8 +71,7 @@ configure_mongodb_for_rocketchat() {
 			*) ERROR "unknown option" ;;
 		esac
 	done
-	# TODO check if this actually works or not this doesn;t
-	sudo sed -iE "s/#(replication)/\1\n  replSetName: ${replicaset_name:-rs0}" "/etc/mongod.config" ||
+	sudo sed -iE 's/#(replication)/\1\n  replSetName: '"'${replicaset_name:-rs0}'"'/' "/etc/mongod.conf" ||
 		ERROR "failed to edit mognodb config; following steps may fail as well"
 	if [[ $(sudo systemctl is-active mongod) != "active" ]]; then
 		WARN "mongodb not running, starting now"
