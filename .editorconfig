@@ -1,8 +1,8 @@
 # for those not using vscode
 
 [*.{sh,bash}]
-  indent_style = space
-  indent_size = 2
+  indent_style = tabs
+  indent_size = 4
 
 shell_variant      = bash
 binary_next_line   = false 
