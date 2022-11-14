@@ -38,7 +38,7 @@ _n_install_node() {
 		FATAL "failed to install $node_version using n"
 		exit 1
 	fi
-	if funcreturn "$(dirname "$(n which "$node_version")")"; then
+	if ! funcreturn "$(dirname "$(n which "$node_version")")"; then
 		ERROR "failed to capture installed node binary path"
 		WARN "falling back on /usr/local/bin/node"
 		funcreturn "/usr/local/bin"
@@ -52,7 +52,7 @@ _nvm_install_node() {
 		FATAL "failed to install $node_version using nvm"
 		exit 1
 	fi
-	if funcreturn "$(dirname "$(_nvm which "$node_version")")"; then
+	if ! funcreturn "$(dirname "$(_nvm which "$node_version")")"; then
 		ERROR "failed to capture installed node binary path"
 		WARN "falling back on /usr/local/bin/node"
 		funcreturn "/usr/local/bin"
