@@ -34,7 +34,7 @@ _install_n() {
 
 _n_install_node() {
 	local node_version="${1?node version is required}"
-	if ! n install "$node_version" &> /dev/null; then
+	if ! n install "$node_version"; then
 		FATAL "failed to install $node_version using n"
 		exit 1
 	fi
@@ -47,11 +47,12 @@ _n_install_node() {
 
 _nvm_install_node() {
 	local node_version="${1?node version is required}"
-	if ! BASH_ENV="$NVM_DIR/nvm.sh" bash -c "nvm install $node_version" &> /dev/null; then
+	_nvm() { BASH_ENV="$NVM_DIR/nvm.sh" bash -c "nvm $*"; }
+	if ! _nvm install "$node_version"; then
 		FATAL "failed to install $node_version using nvm"
 		exit 1
 	fi
-	if funcreturn "$(dirname "$(nvm which "$node_version")")"; then
+	if funcreturn "$(dirname "$(_nvm which "$node_version")")"; then
 		ERROR "failed to capture installed node binary path"
 		WARN "falling back on /usr/local/bin/node"
 		funcreturn "/usr/local/bin"
