@@ -62,6 +62,7 @@ configure_mongodb_for_rocketchat() {
 		OPTARG \
 		replicaset_name \
 		mongo_response_json
+	OPTIND=0
 	while getopts "r:" _opt; do
 		case "$_opt" in
 			r)
