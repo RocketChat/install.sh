@@ -92,7 +92,7 @@ configure_mongodb_for_rocketchat() {
 	fi
 	_debug "mongo_response_json"
 	if ! (($(jq .ok -r <<< "$mongo_response_json"))); then
-		ERROR "$(jq .err -r <<< "$mongo_response_json")"
+		ERROR "$(jq .errmsg -r <<< "$mongo_response_json")"
 		FATAL "failed to initiate replicaset; Rocket.Chat won't work without replicaset enabled"
 		exit 1
 	fi
