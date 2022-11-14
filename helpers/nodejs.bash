@@ -35,7 +35,7 @@ _n_or_nvm_install_node() {
 	local manager="${1?node version manager is required}"
 	local node_version="${2?node version is required}"
 	if ! "$manager" install "$node_version"; then
-		FATAL "failed to install $node_version using n"
+		FATAL "failed to install $node_version using $manager"
 		exit 1
 	fi
 	if funcreturn "$(dirname "$("$manager" which "$node_version")")"; then
@@ -46,11 +46,11 @@ _n_or_nvm_install_node() {
 }
 
 _nvm_install_node() {
-	_n_or_nvm_install_node "nvm" "${2}"
+	_n_or_nvm_install_node "nvm" "${1}"
 }
 
 _n_install_node() {
-	_n_or_nvm_install_node "n" "${2}"
+	_n_or_nvm_install_node "n" "${1}"
 }
 
 _n_handle() {
