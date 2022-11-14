@@ -95,12 +95,14 @@ _manual_install_mongodb() {
 	case "$DISTRO" in
 		debian | ubuntu)
 			_deb_setup_repo "$mongodb_version"
+			pkm update
 			;;
 		centos)
 			_rpm_setup_repo "$mongodb_version"
+			pkm check-update
 			;;
 	esac
-	if ! pkm "mongodb-org"; then
+	if ! pkm install -y "mongodb-org"; then
 		FATAL "failed to install mongodb version $mongodb_version; exiting ..."
 		exit 1
 	fi
