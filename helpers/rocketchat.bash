@@ -114,6 +114,7 @@ configure_rocketchat() {
 		reg_token \
 		replicaset_name \
 		where
+	OPTIND=0
 	while getopts "u:bd:p:r:e:s:w:" _opt; do
 		case "$_opt" in
 			u)
