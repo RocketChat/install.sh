@@ -114,7 +114,7 @@ configure_rocketchat() {
 		reg_token \
 		replicaset_name \
 		where
-	while getops "u:bd:p:r:e:s:w:" _opt; do
+	while getopts "u:bd:p:r:e:s:w:" _opt; do
 		case "$_opt" in
 			u)
 				non_root_user="$OPTARG"
@@ -184,7 +184,6 @@ Environment=REG_TOKEN=$reg_token
 [Install]
 WantedBy=multi-user.target
 EOF
-	EOF
 	sudo systemctl daemon-reload
 	sudo systemctl enable --now rocketchat > /dev/null || FATAL "failed to start Rocket.Chat"
 }
