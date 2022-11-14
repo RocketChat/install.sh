@@ -58,18 +58,12 @@ get_latest_supported_mongodb_version() {
 
 configure_mongodb_for_rocketchat() {
 	local \
-		_path \
-		_bin \
 		_opt \
 		OPTARG \
 		replicaset_name \
 		mongo_response_json
-	while getopts "p:r:" _opt; do
+	while getopts "r:" _opt; do
 		case "$_opt" in
-			p)
-				_path="$OPTARG"
-				_debug "_path"
-				;;
 			r)
 				replicaset_name="$OPTARG"
 				_debug "replicaset_name"
@@ -77,9 +71,7 @@ configure_mongodb_for_rocketchat() {
 			*) ERROR "unknown option" ;;
 		esac
 	done
-	_path="${_path?mongodb binary path must be provided}"
-	path_environment_append "$_path"
-	# TODO check if this actually works or not
+	# TODO check if this actually works or not this doesn;t
 	sudo sed -iE "s/#(replication)/\1\n  replSetName: ${replicaset_name:-rs0}" "/etc/mongod.config" ||
 		ERROR "failed to edit mognodb config; following steps may fail as well"
 	if [[ $(sudo systemctl is-active mongod) != "active" ]]; then
@@ -116,11 +108,10 @@ configure_rocketchat() {
 		oplog_url \
 		port \
 		root_url \
-		node_bin \
 		reg_token \
 		replicaset_name \
 		where
-	while getops "u:bd:p:r:n:e:s:w:" _opt; do
+	while getops "u:bd:p:r:e:s:w:" _opt; do
 		case "$_opt" in
 			u)
 				non_root_user="$OPTARG"
@@ -141,10 +132,6 @@ configure_rocketchat() {
 			r)
 				root_url="$OPTARG"
 				_debug "root_url"
-				;;
-			n)
-				node_bin="$OPTARG"
-				_debug "node_bin"
 				;;
 			e)
 				reg_token="$OPTARG"
@@ -179,7 +166,7 @@ configure_rocketchat() {
 Description=The Rocket.Chat server
 After=network.target remote-fs.target nss-lookup.target mongod.service
 [Service]
-ExecStart=$node_bin $(path_join "$where" main.js)
+ExecStart=$(which node) $(path_join "$where" main.js)
 StandardOutput=syslog
 StandardError=syslog
 SyslogIdentifier=rocketchat
@@ -207,9 +194,8 @@ install_rocketchat() {
 		OPTARG \
 		_opt \
 		release \
-		where \
-		node_path
-	while getopts "v:w:n:" _opt; do
+		where
+	while getopts "v:w:" _opt; do
 		case "$_opt" in
 			v)
 				release="$OPTARG"
@@ -218,11 +204,6 @@ install_rocketchat() {
 			w)
 				where="$OPTARG"
 				_debug "where"
-				;;
-			# TODO remove this
-			n)
-				node_path="$OPTARG"
-				_debug "node_path"
 				;;
 			*) ERROR "unknown argument passed" ;;
 		esac
@@ -252,12 +233,10 @@ install_rocketchat() {
 		exit 1
 	fi
 	INFO "installing nodejs modules"
-	if [[ -z "$node_path" ]]; then
-		WARN "no node path detected.. trying to use default PATH"
-	else
-		INFO "updating PATH for nodejs binaries"
-		path_environment_append "$node_path"
-	fi
-	npm i --production ||
-		ERROR "failed to install all nodejs modules; Rocket.Chat may not work as expected"
+	(
+		cd "$(path_join "$where" programs/server)" &&
+			npm i --production ||
+			ERROR "failed to install all nodejs modules; Rocket.Chat may not work as expected"
+	) &&
+		SUCCESS "node modules successfully installed"
 }

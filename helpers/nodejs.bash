@@ -2,29 +2,7 @@
 
 _source "helpers/lib.bash"
 
-_append_to_shellrc() {
-	local new_path="${1?path required}"
-	case "$(basename "$SHELL")" in
-		fish)
-			echo > ~/.config/fish/conf.d/_rocket.chat.nodejs.path.fish \
-				"export PATH=$new_path:\$PATH"
-			;;
-		bash)
-			echo > ~/.bashrc \
-				"export PATH=$new_path:\$PATH"
-			;;
-		zsh)
-			echo > ~/.zshrc \
-				"export PATH=$new_path:\$PATH"
-			;;
-		*)
-			WARN "unknown shell environment detected; update path by $new_path"
-			;;
-	esac
-}
-
 _install_nvm() {
-	# @returns
 	# https://github.com/nvm-sh/nvm#installation
 	INFO "nstalling nvm"
 	DEBUG "setting NVM_DIR to /opt/nvm"
@@ -36,7 +14,8 @@ _install_nvm() {
 	fi
 	_debug "NVM_DIR"
 	# TODO change hardcoded nvm version
-	if ! curl -fSLso- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash; then
+	if ! curl -fSLso- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh |
+		bash &> /dev/null; then
 		FATAL "failed to install nvm; halting installation"
 		exit 1
 	fi
@@ -49,38 +28,29 @@ _install_n() {
 		exit 1
 	fi
 	INFO "installing n"
-	npm i n -g
+	sudo npm i n -g &> /dev/null || FATAL "failed to install n, can't move on with the installation"
+	SUCCESS "successfully installed n"
 }
-
-_nvm_install_node() {
-	# @returns node binary path
-	local node_version="${1?node version must be passed}"
-	_nvm() {
-		BASH_ENV="$NVM_DIR/nvm.sh" bash -c "nvm $*"
-	}
-	if ! _nvm install "$node_version"; then
-		FATAL "failed to install node $node_version using nvm"
-		exit 2
-	fi
-	if ! funcreturn "$(dirname "$(_nvm which "$node_version")")"; then
-		ERROR "failed to capture installed node binary path"
-		WARN "falling back on /usr/local/bin/node"
-		funcreturn "/usr/local/bin"
-	fi
-}
-
-_n_install_node() {
-	# @returns nodejs binary path
-	local node_version="${1?node version must be passed}"
-	if ! n install "$node_version"; then
+_n_or_nvm_install_node() {
+	local manager="${1?node version manager is required}"
+	local node_version="${2?node version is required}"
+	if ! "$manager" install "$node_version"; then
 		FATAL "failed to install $node_version using n"
 		exit 1
 	fi
-	if funcreturn "$(dirname "$(n which "$node_version")")"; then
+	if funcreturn "$(dirname "$("$manager" which "$node_version")")"; then
 		ERROR "failed to capture installed node binary path"
 		WARN "falling back on /usr/local/bin/node"
 		funcreturn "/usr/local/bin"
 	fi
+}
+
+_nvm_install_node() {
+	_n_or_nvm_install_node "nvm" "${2}"
+}
+
+_n_install_node() {
+	_n_or_nvm_install_node "n" "${2}"
 }
 
 _n_handle() {
@@ -100,14 +70,14 @@ _nvm_handle() {
 _manual_install_node() {
 	# @returns node binary path
 	local node_version="${1?node version must be passed}"
-	local archive_file_name="node-$node_version-linux-x64"
+	local archive_file_name="node-v$node_version-linux-x64"
 	_debug "archive_file_name"
-	local url="https://nodejs.org/dist/$node_version/$archive_file_name.tar.xz"
+	local url="https://nodejs.org/dist/v$node_version/$archive_file_name.tar.xz"
 	_debug "url"
 	INFO "downloading node $node_version installation archive"
 	if ! (
 		cd /tmp
-		curl -LO --fail "$url"
+		curl -sLO --fail "$url"
 	); then
 		FATAL "failed to download nodejs archive"
 		FATAL "cannot move on with installation without a valid node binary; exiting..."
@@ -115,16 +85,14 @@ _manual_install_node() {
 	fi
 	INFO "installing nodejs in /opt/nodejs"
 	# TODO handle directory creation better
-	sudo mkdir /opt/nodejs
-	if ! tar -xJf /tmp/"$archive_file_name".tar.xz -C /opt/nodejs; then
+	[[ -d /opt/nodejs ]] || sudo mkdir /opt/nodejs
+	if ! tar -xJf "/tmp/$archive_file_name.tar.xz" -C /opt/nodejs; then
 		FATAL "failed to extract archive; nodejs install failed"
 		FATAL "cannot move on with installation without a valid node binary; exiting..."
 		exit 1
 	fi
 	local new_path="/opt/nodejs/$archive_file_name/bin"
 	_debug "new_path"
-	_append_to_shellrc "$new_path"
-	path_environment_append "$new_path"
 	funcreturn "$new_path"
 }
 
@@ -135,7 +103,7 @@ install_node() {
 		OPTARG \
 		_opt \
 		node_version \
-		node_exists \
+		node_exists=0 \
 		install_node \
 		n \
 		nvm
@@ -163,7 +131,25 @@ install_node() {
 		esac
 	done
 	node_version="${node_version?nodejs version string required}"
-	command_exists "node" && node_exists=1 || node_exists=0
+	if command_exists "node"; then
+		node_exists=1
+	else
+		local _node
+		if ((n)); then
+			if _node="$(dirname "$(n which "$node_version" 2> /dev/null)")"; then
+				path_environment_append "$_node"
+				node_exists=1
+			fi
+		elif ((nvm)); then
+			local nvm_dir
+			{ [[ -f /opt/nvm/nvm.sh ]] && nvm_dir=/opt/nvm; } ||
+				{ [[ -f $HOME/.nvm/nvm.sh ]] && nvm_dir=$HOME/.nvm; }
+			if _node="$(dirname "$(BASH_ENV="$nvm_dir/nvm.sh" bash -c "nvm which $node_version 2>/dev/null")")"; then
+				path_environment_append "$_node"
+				node_exists=1
+			fi
+		fi
+	fi
 	_debug "node_exists"
 	if ! ((install_node)) && ((node_exists)); then
 		print_node_version_error_and_exit

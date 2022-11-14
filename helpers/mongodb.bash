@@ -29,13 +29,13 @@ _install_m() {
 	m_dir="$HOME/.local/bin"
 	[[ -d "$m_dir" ]] || mkdir "$m_dir" -p
 	m_bin="$(path_join "$m_dir" m)"
-	curl -fsSLo "$m_bin" "$M_BIN_URL" --fail || {
+	if ! curl -fsSLo "$m_bin" "$M_BIN_URL" --fail; then
 		FATAL "failed to install m. you can try using manual install method instead"
 		exit 1
-	}
+	fi
 	chmod u+x "$m_bin"
 	SUCCESS "successfully installed mongodb version manager (m)"
-	funcreturn "$m_bin"
+	funcreturn "$m_dir"
 }
 
 _m_install_mongodb() {
@@ -46,15 +46,13 @@ _m_install_mongodb() {
 	mongodb_version="${1?mongodb version must be passed}"
 	m_bin="$(funcrun _install_m)"
 	_debug "m_bin"
-	function _m() {
-		"$m_bin" "$@"
-	}
-	_m "$mongodb_version" || {
+	path_environment_append "$m_bin"
+	if ! m "$mongodb_version"; then
 		FATAL "failed to install mongodb version $mongodb_version; exiting ..."
-		exit 2
-	}
+		exit 1
+	fi
 	# m returns path without binary name appended
-	funcreturn "$(_m which "$mongodb_version")"
+	funcreturn "$(m which "$mongodb_version")"
 }
 
 _deb_setup_repo() {
@@ -102,7 +100,7 @@ _manual_install_mongodb() {
 			_rpm_setup_repo "$mongodb_version"
 			;;
 	esac
-	if ! install_pkg "mongodb-org"; then
+	if ! pkm "mongodb-org"; then
 		FATAL "failed to install mongodb version $mongodb_version; exiting ..."
 		exit 1
 	fi
@@ -132,8 +130,8 @@ install_mongodb() {
 	if ((m)); then
 		INFO "using m for mongodb"
 		_m_install_mongodb "$mongodb_version"
-	else
-		INFO "manually installing mongodb"
-		_manual_install_mongodb "$mongodb_version"
+		return
 	fi
+	INFO "manually installing mongodb"
+	_manual_install_mongodb "$mongodb_version"
 }

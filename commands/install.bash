@@ -31,11 +31,6 @@ _handle_preinstalled_mongodb() {
 	is_storage_engine_wiredTiger || WARN "you are currently not using wiredTiger storage engine."
 }
 
-# 1. install mongodb
-# 2. install nodejs
-# 3. install rocketchat
-# 4. configure mongodb for rocketchat
-# 5. configure rocketchat
 run_install() {
 	local root_url=
 	local port=
@@ -166,10 +161,20 @@ run_install() {
 		esac
 	done
 
-	# shellcheck disable=2155
-	verify_release "${release:-latest}"
+	#
+	#
+	#
+	#
+	#
+	#
+	#
+	#
+	#
+	#
 
-	######### Start of Node js install
+	# shellcheck disable=2155
+	verify_release "${release:=latest}"
+
 	# shellcheck disable=2155
 	node_version_required="$(funcrun get_required_node_version)"
 	_debug "node_version_required"
@@ -182,11 +187,56 @@ run_install() {
 
 	path_environment_append "$node_path"
 
-	######### End of Node install
+	#
+	#
+	#
+	#
+	#
+	#
+	#
+	#
+	#
+	#
+	#
+	#
+	#
 
-	##### Start of Mongodb install
 	if command_exists "mongod"; then
-		_handle_preinstalled_mongodb "$use_mongo"
+		INFO "detecting existing mongodb installation"
+		if ! is_mongod_ready; then
+			FATAL "failed to connect to mongodb; required to check configuration" \
+				"please make sure installed mongodb server is running before runnning this script"
+			exit 1
+		fi
+
+		local local_mongod_version="$(funcrun get_current_mongodb_version)"
+		if is_mongodb_version_supported "$local_mongod_version"; then
+			if ! ((use_mongo)); then
+				FATAL "installed mongodb version isn't supported." \
+					"supported versions are $(get_supported_mongodb_versions_str)." \
+					"use --use-mongo option to ignore this"
+				exit 1
+			fi
+			WARN "your installed version isn't supported; Rocket.Chat may not work as expected"
+			WARN "supported versions are $(funcrun get_supported_mongodb_versions_str)."
+		fi
+		# TODO decide if this needs to be a FATAL error
+		is_storage_engine_wiredTiger || WARN "you are currently not using wiredTiger storage engine."
+
+		#
+		#
+		#
+		#
+		#
+		#
+		#
+		#
+		#
+		#
+		#
+		#
+		#
+
 	elif [[ -n "$mongo_version" ]]; then
 		_debug "mongo_version"
 		# mongo version was passed
@@ -199,6 +249,19 @@ run_install() {
 		INFO "installing mongodb version $mongo_version"
 		_debug "install_mongodb_arg"
 		mongodb_path="$(funcrun install_mongodb "${install_mongodb_arg[@]}")"
+
+		#
+		#
+		#
+		#
+		#
+		#
+		#
+		#
+		#
+		#
+		#
+
 	else
 		DEBUG "installing latest mongodb version for Rocket.Chat release $release"
 		mongo_version="$(funcrun get_latest_supported_mongodb_version)"
@@ -210,17 +273,40 @@ run_install() {
 	_debug "mongodb_path"
 	path_environment_append "$mongodb_path"
 
-	###### End of mongodb install
+	#
+	#
+	#
+	#
+	#
+	#
+	#
+	#
+	#
+	#
+	#
 
-	install_rocketchat -v "$release" -w "${rocketchat_directory:=/opt/Rocket.Chat}" -n "$node_path"
+	install_rocketchat -v "$release" -w "${rocketchat_directory:-/opt/Rocket.Chat}" 
 
-	configure_mongodb_for_rocketchat -p "$mongodb_path" -r "rs0"
+	#
+	#
+	#
+	#
+	#
+
+	configure_mongodb_for_rocketchat -r "rs0"
+
+	#
+	#
+	#
+	#
+	#
+	#
+
 	configure_rocketchat \
 		-u "rocketchat" \
 		-d "rocketchat" \
 		-p "${port:=3000}" \
 		-r "${root_url:=http://localhost:3000}" \
-		-n "$(path_join "$node_path" node)" \
 		-e "${reg_token}" \
 		-s "rs0" \
 		-w "${rocketchat_directory:-/opt/Rocket.Chat}"

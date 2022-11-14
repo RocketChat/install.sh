@@ -4,6 +4,11 @@ _source "messages/en.bash"
 _source "b-log/b-log.sh"
 _source "bash_concurrent/multiprocess.bash"
 
+getopts() {
+	OPTIND=0
+	builtin getopts "$@"
+}
+
 _debug() {
 	# @description helper for variable debug messages
 	# @params variable name
@@ -90,12 +95,3 @@ path_environment_append() {
 	[[ "$PATH" == ?(*:)"$_path"?(:*) ]] || export PATH="$_path:$PATH"
 }
 
-install_pkg() {
-	local cmd=()
-	case "$DISTRO" in
-		ubuntu | debian) cmd=(sudo apt install -y) ;;
-		rhel | centos) cmd=(sudo yum install -y) ;; #TODO add rocky
-		*) FATAL "unsupported distribution" ;; # shouldn't be here
-	esac
-	"${cmd[@]}" "$@"
-}

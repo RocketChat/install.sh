@@ -63,5 +63,5 @@ pkm() {
 			;;
 	esac
 	DEBUG "using install_command \"$cmd\""
-	$cmd "$@"
+	"$cmd" "$@"
 }
