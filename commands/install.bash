@@ -31,6 +31,11 @@ _handle_preinstalled_mongodb() {
 	is_storage_engine_wiredTiger || WARN "you are currently not using wiredTiger storage engine."
 }
 
+# 1. install mongodb
+# 2. install nodejs
+# 3. install rocketchat
+# 4. configure mongodb for rocketchat
+# 5. configure rocketchat
 run_install() {
 	local root_url=
 	local port=
@@ -175,6 +180,8 @@ run_install() {
 	node_path="$(funcrun install_node "${install_node_arg[@]}")"
 	_debug "node_path"
 
+	path_environment_append "$node_path"
+
 	######### End of Node install
 
 	##### Start of Mongodb install
@@ -201,10 +208,13 @@ run_install() {
 	fi
 
 	_debug "mongodb_path"
+	path_environment_append "$mongodb_path"
+
 	###### End of mongodb install
 
-	configure_mongodb_for_rocketchat -p "$mongodb_path" -r "rs0"
 	install_rocketchat -v "$release" -w "${rocketchat_directory:=/opt/Rocket.Chat}" -n "$node_path"
+
+	configure_mongodb_for_rocketchat -p "$mongodb_path" -r "rs0"
 	configure_rocketchat \
 		-u "rocketchat" \
 		-d "rocketchat" \
@@ -213,5 +223,5 @@ run_install() {
 		-n "$(path_join "$node_path" node)" \
 		-e "${reg_token}" \
 		-s "rs0" \
-		-w "$rocketchat_directory"
+		-w "${rocketchat_directory:-/opt/Rocket.Chat}"
 }

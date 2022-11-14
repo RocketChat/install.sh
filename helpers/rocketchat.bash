@@ -57,7 +57,6 @@ get_latest_supported_mongodb_version() {
 }
 
 configure_mongodb_for_rocketchat() {
-	# assume yq installed
 	local \
 		_path \
 		_bin \
@@ -79,28 +78,28 @@ configure_mongodb_for_rocketchat() {
 		esac
 	done
 	_path="${_path?mongodb binary path must be provided}"
-	_bin="$(path_join "$_path" "mongo")"
-	function _mongo {
-		"$_bin" "$@"
-	}
-	yq -i e ".replication.replSetName = ${replicaset_name:=rs0}" "/etc/mongod.conf" ||
+	path_environment_append "$_path"
+	# TODO check if this actually works or not
+	sudo sed -iE "s/#(replication)/\1\n  replSetName: ${replicaset_name:-rs0}" "/etc/mongod.config" ||
 		ERROR "failed to edit mognodb config; following steps may fail as well"
-	if [[ $(systemctl is-active mongo) != "active" ]]; then
+	if [[ $(sudo systemctl is-active mongod) != "active" ]]; then
 		WARN "mongodb not running, starting now"
-		systemctl enable --now mongo > /dev/null || ERROR "failed to start up mongodb" \
+		sudo systemctl enable --now mongod > /dev/null || ERROR "failed to start up mongodb" \
 			"this may result in unexpected behaviour in Rocket.Chat startup"
 		SUCCESS "mongodb successfully started"
+	else
+		sudo systemctl restart mongod > /dev/null
 	fi
 	if ! mongo_response_json="$(
-		_mongo --quiet --eval "printjson(rs.initiate({_id: '$replicaset_name', members: [{ _id: 0, host: 'localhost:27017' }]}))"
+		mongo --quiet --eval "printjson(rs.initiate({_id: '$replicaset_name', members: [{ _id: 0, host: 'localhost:27017' }]}))"
 	)"; then
 		FATAL "failed to initiate replicaset; Rocket.Chat won't work without replicaset enabled. exiting ..."
-		exit 3
+		exit 1
 	fi
 	if ! (($(jq .ok -r <<< "$mongo_response_json"))); then
 		ERROR "$(jq .err -r <<< "$mongo_response_json")"
 		FATAL "failed to initiate replicaset; Rocket.Chat won't work without replicaset enabled"
-		exit 3
+		exit 1
 	fi
 	SUCCESS "mongodb successfully configured"
 }
@@ -169,7 +168,7 @@ configure_rocketchat() {
 			"although you should take care of it. use 'rocketchatctl doctor' to make an attempt at fixing"
 	else
 		# FIXME
-		sudo chown -R "$non_root_user:$non_root_user" /
+		sudo chown -R "$non_root_user:$non_root_user" "$where"
 	fi
 	mongo_url="mongodb://localhost:27017/$database?replicaSet=$replicaset_name"
 	oplog_url="mongodb://localhost:27017/local?replicaSet=$replicaset_name"
@@ -180,7 +179,7 @@ configure_rocketchat() {
 Description=The Rocket.Chat server
 After=network.target remote-fs.target nss-lookup.target mongod.service
 [Service]
-ExecStart=$node_bin ${where:-/opt/Rocket.Chat/main.js}
+ExecStart=$node_bin $(path_join "$where" main.js)
 StandardOutput=syslog
 StandardError=syslog
 SyslogIdentifier=rocketchat
@@ -196,13 +195,14 @@ Environment=REG_TOKEN=$reg_token
 WantedBy=multi-user.target
 EOF
 	EOF
-	systemctl daemon-reload
-	systemctl enable --now rocketchat || ERROR "failed to start Rocket.Chat"
+	sudo systemctl daemon-reload
+	sudo systemctl enable --now rocketchat > /dev/null || FATAL "failed to start Rocket.Chat"
 }
 
 install_rocketchat() {
 	# @description installs passed Rocket.Chat version
 	# @exits on ERROR
+	# expect node in current top path is the one required
 	local \
 		OPTARG \
 		_opt \
@@ -219,6 +219,7 @@ install_rocketchat() {
 				where="$OPTARG"
 				_debug "where"
 				;;
+			# TODO remove this
 			n)
 				node_path="$OPTARG"
 				_debug "node_path"
@@ -243,12 +244,12 @@ install_rocketchat() {
 	INFO "downloading Rocket.Chat"
 	if ! $run_cmd curl -fsSLo "$archive_file" "https://releases.rocket.chat/$release/download"; then
 		FATAL "failed to download rocketchat archive; exiting..."
-		exit 5
+		exit 1
 	fi
 	INFO "extracting archive"
 	if ! $run_cmd tar xzf "$archive_file" --strip-components=1 -C "$where"; then
 		FATAL "unable to extract rocketchat archive; exiting ..."
-		exit 6
+		exit 1
 	fi
 	INFO "installing nodejs modules"
 	if [[ -z "$node_path" ]]; then

@@ -11,5 +11,4 @@ systemLog:
   destination: syslog
 processManagement:
   pidFilePath: $SNAP_COMMON/mongod.pid
-replication:
-  replSetName: rs0
+#replication
