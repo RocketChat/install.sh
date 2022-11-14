@@ -4,7 +4,7 @@ _source "helpers/lib.bash"
 
 _install_nvm() {
 	# https://github.com/nvm-sh/nvm#installation
-	INFO "nstalling nvm"
+	INFO "installing nvm"
 	DEBUG "setting NVM_DIR to /opt/nvm"
 	if (sudo mkdir /opt/nvm && sudo chown "$(id -u)":"$(id -g)" /opt/nvm) 2> /dev/null; then
 		export NVM_DIR="/opt/nvm"
@@ -31,26 +31,31 @@ _install_n() {
 	sudo npm i n -g &> /dev/null || FATAL "failed to install n, can't move on with the installation"
 	SUCCESS "successfully installed n"
 }
-_n_or_nvm_install_node() {
-	local manager="${1?node version manager is required}"
-	local node_version="${2?node version is required}"
-	if ! "$manager" install "$node_version"; then
-		FATAL "failed to install $node_version using $manager"
+
+_n_install_node() {
+	local node_version="${1?node version is required}"
+	if ! n install "$node_version" &> /dev/null; then
+		FATAL "failed to install $node_version using n"
 		exit 1
 	fi
-	if funcreturn "$(dirname "$("$manager" which "$node_version")")"; then
+	if funcreturn "$(dirname "$(n which "$node_version")")"; then
 		ERROR "failed to capture installed node binary path"
 		WARN "falling back on /usr/local/bin/node"
 		funcreturn "/usr/local/bin"
 	fi
 }
 
-_nvm_install_node() {
-	_n_or_nvm_install_node "nvm" "${1}"
-}
-
 _n_install_node() {
-	_n_or_nvm_install_node "n" "${1}"
+	local node_version="${1?node version is required}"
+	if ! BASH_ENV="$NVM_DIR/nvm.sh" bash -c "nvm install $node_version" &> /dev/null; then
+		FATAL "failed to install $node_version using nvm"
+		exit 1
+	fi
+	if funcreturn "$(dirname "$(nvm which "$node_version")")"; then
+		ERROR "failed to capture installed node binary path"
+		WARN "falling back on /usr/local/bin/node"
+		funcreturn "/usr/local/bin"
+	fi
 }
 
 _n_handle() {
