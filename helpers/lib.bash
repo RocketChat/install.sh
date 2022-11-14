@@ -4,11 +4,6 @@ _source "messages/en.bash"
 _source "b-log/b-log.sh"
 _source "bash_concurrent/multiprocess.bash"
 
-getopts() {
-	OPTIND=0
-	builtin getopts "$@"
-}
-
 _debug() {
 	# @description helper for variable debug messages
 	# @params variable name
