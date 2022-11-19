@@ -38,11 +38,10 @@ _n_install_node() {
 		FATAL "failed to install $node_version using n"
 		exit 1
 	fi
-	if ! funcreturn "$(dirname "$(n which "$node_version")")"; then
-		ERROR "failed to capture installed node binary path"
-		WARN "falling back on /usr/local/bin/node"
-		funcreturn "/usr/local/bin"
-	fi
+	funcreturn "$(dirname "$(n which "$node_version")")" && return
+	ERROR "failed to capture installed node binary path"
+	WARN "falling back on /usr/local/bin/node"
+	funcreturn "/usr/local/bin"
 }
 
 _nvm_install_node() {
@@ -52,11 +51,10 @@ _nvm_install_node() {
 		FATAL "failed to install $node_version using nvm"
 		exit 1
 	fi
-	if ! funcreturn "$(dirname "$(_nvm which "$node_version")")"; then
-		ERROR "failed to capture installed node binary path"
-		WARN "falling back on /usr/local/bin/node"
-		funcreturn "/usr/local/bin"
-	fi
+	funcreturn "$(dirname "$(_nvm which "$node_version")")" && return
+	ERROR "failed to capture installed node binary path"
+	WARN "falling back on /usr/local/bin/node"
+	funcreturn "/usr/local/bin"
 }
 
 _n_handle() {
@@ -91,6 +89,7 @@ _manual_install_node() {
 	fi
 	INFO "installing nodejs in /opt/nodejs"
 	# TODO handle directory creation better
+	# FIXME you know what
 	[[ -d /opt/nodejs ]] || sudo mkdir /opt/nodejs
 	if ! tar -xJf "/tmp/$archive_file_name.tar.xz" -C /opt/nodejs; then
 		FATAL "failed to extract archive; nodejs install failed"
@@ -100,6 +99,37 @@ _manual_install_node() {
 	local new_path="/opt/nodejs/$archive_file_name/bin"
 	_debug "new_path"
 	funcreturn "$new_path"
+}
+
+check_node_exists_and_fix_path_for_script() {
+	local \
+		node_version \
+		_node \
+		nvm_dir
+	node_version="${1?node version must be passed}"
+	_debug "node_version"
+	if command_exists "node"; then
+		return 0
+	fi
+	# if using n, expect it (n) to be in PATH
+	if command_exists n && _node="$(dirname "$(n which "$node_version" 2> /dev/null)")"; then
+		path_environment_append "$_node"
+		return 0
+	fi
+	if command_exists nvm && _node="$(dirname "$(nvm which "$node_version" 2> /dev/null)")"; then
+		path_environment_append "$_node"
+		return 0
+	fi
+	# in case nvm source is not in bashrc/zshrc or similar
+	local nvm_dir
+	# it's either the custom nvm_dir rocketchatctl sets or the default
+	{ [[ -f /opt/nvm/nvm.sh ]] && nvm_dir=/opt/nvm; } || { [[ -f $HOME/.nvm/nvm.sh ]] && nvm_dir=$HOME/.nvm; }
+	if [[ -n "$nvm_dir" ]] && _node="$(dirname "$(BASH_ENV="$nvm_dir/nvm.sh" bash -c "nvm which $node_version" 2> /dev/null)")"; then
+		path_environment_append "$_node"
+		return 0
+	fi
+	# sorry, no node
+	return 1
 }
 
 # change usage of globals
@@ -113,6 +143,8 @@ install_node() {
 		install_node \
 		n \
 		nvm
+	OPTIND=0
+	# -v version, -y install_node, -n use n, -b use nvm
 	while getopts "v:ynb" _opt; do
 		case "$_opt" in
 			v)
@@ -137,26 +169,8 @@ install_node() {
 		esac
 	done
 	node_version="${node_version?nodejs version string required}"
-	if command_exists "node"; then
-		node_exists=1
-	else
-		local _node
-		if ((n)); then
-			if command_exists n && _node="$(dirname "$(n which "$node_version" 2> /dev/null)")"; then
-				path_environment_append "$_node"
-				node_exists=1
-			fi
-		elif ((nvm)); then
-			local nvm_dir
-			{ [[ -f /opt/nvm/nvm.sh ]] && nvm_dir=/opt/nvm; } ||
-				{ [[ -f $HOME/.nvm/nvm.sh ]] && nvm_dir=$HOME/.nvm; }
-			if [[ -n "$nvm_dir" ]] && _node="$(dirname "$(BASH_ENV="$nvm_dir/nvm.sh" bash -c "nvm which $node_version" 2> /dev/null)")"; then
-				path_environment_append "$_node"
-				node_exists=1
-			fi
-		fi
-	fi
-	_debug "node_exists"
+	# FIXME
+	check_node_exists_and_fix_path_for_script "$node_version" && node_exists=1
 	if ! ((install_node)) && ((node_exists)); then
 		print_node_version_error_and_exit
 	fi

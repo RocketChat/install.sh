@@ -31,6 +31,7 @@ _handle_preinstalled_mongodb() {
 	is_storage_engine_wiredTiger || WARN "you are currently not using wiredTiger storage engine."
 }
 
+# entrypoint for the install command
 run_install() {
 	local root_url=
 	local port=
@@ -209,7 +210,8 @@ run_install() {
 			exit 1
 		fi
 
-		local local_mongod_version="$(funcrun get_current_mongodb_version)"
+		local local_mongod_version
+		local_mongod_version="$(funcrun get_current_mongodb_version)"
 		if is_mongodb_version_supported "$local_mongod_version"; then
 			if ! ((use_mongo)); then
 				FATAL "installed mongodb version isn't supported." \
@@ -222,21 +224,6 @@ run_install() {
 		fi
 		# TODO decide if this needs to be a FATAL error
 		is_storage_engine_wiredTiger || WARN "you are currently not using wiredTiger storage engine."
-
-		#
-		#
-		#
-		#
-		#
-		#
-		#
-		#
-		#
-		#
-		#
-		#
-		#
-
 	elif [[ -n "$mongo_version" ]]; then
 		_debug "mongo_version"
 		# mongo version was passed
@@ -249,19 +236,6 @@ run_install() {
 		INFO "installing mongodb version $mongo_version"
 		_debug "install_mongodb_arg"
 		mongodb_path="$(funcrun install_mongodb "${install_mongodb_arg[@]}")"
-
-		#
-		#
-		#
-		#
-		#
-		#
-		#
-		#
-		#
-		#
-		#
-
 	else
 		DEBUG "installing latest mongodb version for Rocket.Chat release $release"
 		mongo_version="$(funcrun get_latest_supported_mongodb_version)"
@@ -285,7 +259,7 @@ run_install() {
 	#
 	#
 
-	install_rocketchat -v "$release" -w "${rocketchat_directory:-/opt/Rocket.Chat}" 
+	install_rocketchat -v "$release" -w "${rocketchat_directory:-/opt/Rocket.Chat}"
 
 	#
 	#
@@ -301,13 +275,13 @@ run_install() {
 	#
 	#
 	#
-
 	configure_rocketchat \
 		-u "rocketchat" \
 		-d "rocketchat" \
-		-p "${port:=3000}" \
-		-r "${root_url:=http://localhost:3000}" \
+		-p "${port:-3000}" \
+		-r "${root_url:-http://localhost:3000}" \
 		-e "${reg_token}" \
 		-s "rs0" \
-		-w "${rocketchat_directory:-/opt/Rocket.Chat}"
+		-w "${rocketchat_directory:-/opt/Rocket.Chat}" \
+		-n "$node_path"
 }

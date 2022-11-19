@@ -18,7 +18,14 @@ is_storage_engine_wiredTiger() {
 }
 
 is_mongod_ready() {
-	(("$(mongo --quiet --eval 'db.adminCommand({ ping: 1 }).ok')" == 1))
+	local max_attempt=30 \
+		current=0
+	while ((current < max_attempt)); do
+		(("$(mongo 2> /dev/null --quiet --eval 'db.adminCommand({ ping: 1 }).ok')" == 1)) && return 0
+		((current++))
+		sleep 1
+	done
+	return 1
 }
 
 _install_m() {
@@ -119,6 +126,7 @@ install_mongodb() {
 	while getopts "mv:" _opt; do
 		case "$_opt" in
 			m)
+				# use m?
 				m=1
 				_debug "m"
 				;;

@@ -59,7 +59,6 @@ get_latest_supported_mongodb_version() {
 configure_mongodb_for_rocketchat() {
 	local \
 		_opt \
-		OPTARG \
 		replicaset_name \
 		mongo_response_json
 	OPTIND=0
@@ -76,13 +75,17 @@ configure_mongodb_for_rocketchat() {
 		ERROR "failed to edit mognodb config; following steps may fail as well"
 	if [[ $(sudo systemctl is-active mongod) != "active" ]]; then
 		WARN "mongodb not running, starting now"
-		sudo systemctl enable --now mongod > /dev/null || ERROR "failed to start up mongodb" \
+		sudo systemctl enable --now mongod &> /dev/null || ERROR "failed to start up mongodb" \
 			"this may result in unexpected behaviour in Rocket.Chat startup"
 		SUCCESS "mongodb successfully started"
 	else
-		sudo systemctl restart mongod > /dev/null
+		sudo systemctl restart mongod &> /dev/null || ERROR "failed to restart mongodb" \
+			"Rocket.Chat might not successfully start up"
 	fi
-	sleep 5
+	if ! is_mongod_ready; then
+		FATAL "timed out waiting for mongodb to start up"
+		exit 1
+	fi
 	if ! mongo_response_json="$(
 		mongo --quiet --eval "JSON.stringify(rs.initiate({_id: '$replicaset_name', members: [{ _id: 0, host: 'localhost:27017' }]}))"
 	)"; then
@@ -103,7 +106,6 @@ configure_rocketchat() {
 	# @exits on error
 	local \
 		_opt \
-		OPTARG \
 		non_root_user \
 		bind_loopback \
 		database \
@@ -113,9 +115,10 @@ configure_rocketchat() {
 		root_url \
 		reg_token \
 		replicaset_name \
-		where
+		where \
+		node_path
 	OPTIND=0
-	while getopts "u:bd:p:r:e:s:w:" _opt; do
+	while getopts "u:bd:p:r:e:s:w:n:" _opt; do
 		case "$_opt" in
 			u)
 				non_root_user="$OPTARG"
@@ -149,6 +152,10 @@ configure_rocketchat() {
 				where="$OPTARG"
 				_debug "where"
 				;;
+			n)
+				node_path="$OPTARG"
+				_debug 'node_path'
+				;;
 			*) ERROR "unknown option" ;;
 		esac
 	done
@@ -170,7 +177,7 @@ configure_rocketchat() {
 Description=The Rocket.Chat server
 After=network.target remote-fs.target nss-lookup.target mongod.service
 [Service]
-ExecStart=$(which node) $(path_join "$where" main.js)
+ExecStart=$(path_join "$node_path" node) $(path_join "$where" main.js)
 StandardOutput=syslog
 StandardError=syslog
 SyslogIdentifier=rocketchat
@@ -185,8 +192,8 @@ Environment=REG_TOKEN=$reg_token
 [Install]
 WantedBy=multi-user.target
 EOF
-	sudo systemctl daemon-reload
-	sudo systemctl enable --now rocketchat > /dev/null || FATAL "failed to start Rocket.Chat"
+	sudo systemctl daemon-reload &> /dev/null
+	sudo systemctl enable --now rocketchat &> /dev/null || FATAL "failed to start Rocket.Chat"
 }
 
 install_rocketchat() {
@@ -194,10 +201,10 @@ install_rocketchat() {
 	# @exits on ERROR
 	# expect node in current top path is the one required
 	local \
-		OPTARG \
 		_opt \
 		release \
 		where
+	OPTIND=0
 	while getopts "v:w:" _opt; do
 		case "$_opt" in
 			v)
@@ -216,7 +223,7 @@ install_rocketchat() {
 	# shellcheck disable=SC2155
 	DEBUG "destination: $where"
 	local parent_dir="$(dirname "${where}")"
-	DEBUG "parent_dir: $parent_dir"
+	_debug "parent_dir"
 	local run_cmd=
 	if is_dir_accessible "$parent_dir"; then
 		DEBUG "$parent_dir not accessible"
@@ -224,6 +231,7 @@ install_rocketchat() {
 		run_cmd="sudo"
 	fi
 	local archive_file="$where/rocket.chat.$release.tar.gz"
+	_debug "archive_file"
 	$run_cmd mkdir "$where" -p
 	INFO "downloading Rocket.Chat"
 	if ! $run_cmd curl -fsSLo "$archive_file" "https://releases.rocket.chat/$release/download"; then
@@ -242,4 +250,5 @@ install_rocketchat() {
 			ERROR "failed to install all nodejs modules; Rocket.Chat may not work as expected"
 	) &&
 		SUCCESS "node modules successfully installed"
+	$run_cmd rm -f "$archive_file"
 }
