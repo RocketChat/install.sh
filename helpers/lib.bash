@@ -1,6 +1,6 @@
 #! /usr/bin/env bash
 
-[[ -n "${__GUARD_SOURCE_LIB+-@}" ]] && return
+[[ -n "${__GUARD_SOURCE_LIB+@}" ]] && return
 
 export __GUARD_SOURCE_LIB=
 

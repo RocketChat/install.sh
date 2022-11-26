@@ -1,6 +1,6 @@
 #!/bin/bash
 
-[[ -n "${__GUARD_SOURCE_NODEJS+-@}" ]] && return
+[[ -n "${__GUARD_SOURCE_NODEJS+@}" ]] && return
 export __GUARD_SOURCE_NODEJS=
 
 source "helpers/lib.bash"

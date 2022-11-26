@@ -1,6 +1,6 @@
 #!/bin/bash
 
-[[ -n "${__GUARD_SOURCE_INSTALL_COMMAND:-@}" ]] && return
+[[ -n "${__GUARD_SOURCE_INSTALL_COMMAND+@}" ]] && return
 
 export __GUARD_SOURCE_INSTALL_COMMAND=
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-[[ -n "${__GUARD_SOURCE_MONGODB+-@}" ]] && return
+[[ -n "${__GUARD_SOURCE_MONGODB+@}" ]] && return
 export __GUARD_SOURCE_MONGODB=
 
 source "b-log/b-log.sh"

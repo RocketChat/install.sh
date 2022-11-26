@@ -1,6 +1,6 @@
 #!/bin/bash
 
-[[ -n "${__GUARD_SOURCE_ROCKETCHAT+-@}" ]] && return
+[[ -n "${__GUARD_SOURCE_ROCKETCHAT+@}" ]] && return
 export __GUARD_SOURCE_ROCKETCHAT=
 
 source "b-log/b-log.sh"
