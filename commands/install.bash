@@ -1,11 +1,15 @@
 #!/bin/bash
 
-_source "messages/en.bash"
-_source "b-log/b-log.sh"
-_source "helpers/rocketchat.bash"
-_source "helpers/mongodb.bash"
-_source "helpers/nodejs.bash"
-_source "helpers/lib.bash"
+[[ -n "${__GUARD_SOURCE_INSTALL_COMMAND:-@}" ]] && return
+
+export __GUARD_SOURCE_INSTALL_COMMAND=
+
+source "messages/en.bash"
+source "b-log/b-log.sh"
+source "helpers/rocketchat.bash"
+source "helpers/mongodb.bash"
+source "helpers/nodejs.bash"
+source "helpers/lib.bash"
 
 _handle_preinstalled_mongodb() {
 	local use_mongo="$1"

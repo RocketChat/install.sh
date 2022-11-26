@@ -1,8 +1,12 @@
 #! /usr/bin/env bash
 
-_source "messages/en.bash"
-_source "b-log/b-log.sh"
-_source "bash_concurrent/multiprocess.bash"
+[[ -n "${__GUARD_SOURCE_LIB+-@}" ]] && return
+
+export __GUARD_SOURCE_LIB=
+
+source "messages/en.bash"
+source "b-log/b-log.sh"
+source "bash_concurrent/multiprocess.bash"
 
 _debug() {
 	# @description helper for variable debug messages

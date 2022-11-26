@@ -5,10 +5,6 @@ shopt -s extglob
 
 # TODO: better way of handling errors than ERROR::{exit 1;}
 
-_source() {
-	# shellcheck disable=1090
-	source "$(dirname "$(realpath "$0")")"/"${1?path is required}"
-}
 
 # TODO change this
 _source "messages/en.bash"

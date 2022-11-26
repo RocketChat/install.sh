@@ -1,6 +1,9 @@
 #!/bin/bash
 
-_source "helpers/lib.bash"
+[[ -n "${__GUARD_SOURCE_NODEJS+-@}" ]] && return
+export __GUARD_SOURCE_NODEJS=
+
+source "helpers/lib.bash"
 
 # shellcheck disable=2120
 _install_nvm() {

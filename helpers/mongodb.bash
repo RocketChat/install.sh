@@ -1,7 +1,10 @@
 #!/bin/bash
 
-_source "b-log/b-log.sh"
-_source "helpers/lib.bash"
+[[ -n "${__GUARD_SOURCE_MONGODB+-@}" ]] && return
+export __GUARD_SOURCE_MONGODB=
+
+source "b-log/b-log.sh"
+source "helpers/lib.bash"
 
 M_BIN_URL="https://raw.githubusercontent.com/aheckmann/m/master/bin/m"
 

@@ -1,7 +1,10 @@
 #!/bin/bash
 
-_source "b-log/b-log.sh"
-_source "helpers/lib.bash"
+[[ -n "${__GUARD_SOURCE_ROCKETCHAT+-@}" ]] && return
+export __GUARD_SOURCE_ROCKETCHAT=
+
+source "b-log/b-log.sh"
+source "helpers/lib.bash"
 
 export RELEASE_INFO_JSON=
 export COMPATIBLE_MONGODB_VERSIONS_JSON=

@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 
-_source "b-log/b-log.sh"
-_source "messages/en.bash"
-_source "helpers/lib.bash"
+[[ -n "${__GUARD_SOURCE_HOST+-@}" ]] && return
+
+export __GUARD_SOURCE_HOST=
+
+source "b-log/b-log.sh"
+source "messages/en.bash"
+source "helpers/lib.bash"
 
 {
 	[[ -r /etc/os-release ]] || print_no_release_information_file_found_error
