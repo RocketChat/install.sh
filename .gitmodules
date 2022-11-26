@@ -1,0 +1,6 @@
+[submodule "b-log"]
+	path = b-log
+	url = https://github.com/debdutdeb/b-log.git
+[submodule "bash-argsparse"]
+	path = bash-argsparse
+	url = https://github.com/debdutdeb/bash-argsparse
