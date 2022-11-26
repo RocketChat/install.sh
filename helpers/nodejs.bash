@@ -2,12 +2,15 @@
 
 _source "helpers/lib.bash"
 
+# shellcheck disable=2120
 _install_nvm() {
 	# https://github.com/nvm-sh/nvm#installation
+	local nvm_dir="${1:-/opt/nvm}"
+	_debug "nvm_dir"
 	INFO "installing nvm"
-	DEBUG "setting NVM_DIR to /opt/nvm"
-	if (sudo mkdir /opt/nvm && sudo chown "$(id -u)":"$(id -g)" /opt/nvm) 2> /dev/null; then
-		export NVM_DIR="/opt/nvm"
+	DEBUG "setting NVM_DIR to $nvm_dir"
+	if (sudo mkdir "$nvm_dir" && sudo chown "$(id -u)":"$(id -g)" "$nvm_dir") 2> /dev/null; then
+		export NVM_DIR="$nvm_dir"
 	else
 		WARN "failed to create /opt/nvm; installing nvm in $HOME/.nvm"
 		export NVM_DIR="$HOME/.nvm"
