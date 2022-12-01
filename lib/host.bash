@@ -56,7 +56,7 @@ is_host_supported() {
 }
 
 pkm() {
-	# TODO refactor?
+	elevate_privilege
 	local cmd=
 	case "$DISTRO" in
 	debian | ubuntu)

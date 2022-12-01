@@ -72,6 +72,7 @@ _m_install_mongodb() {
 }
 
 _deb_setup_repo() {
+	elevate_privilege
 	local mongodb_version="${1?mongodb version required}"
 	mongodb_version="${mongodb_version%.*}"
 	local key_url="https://www.mongodb.org/static/pgp/server-$mongodb_version.asc"
@@ -85,17 +86,18 @@ _deb_setup_repo() {
 	local repo_url="deb [ arch=amd64 signed-by=$key_file ] https://repo.mongodb.org/apt/$DISTRO $DISTRO_CODENAME/mongodb-org/$mongodb_version ${repo[$DISTRO]}"
 	DEBUG "repo_url: $repo_url"
 	INFO "saving repository data to file"
-	curl -fsSL "$key_url" | sudo gpg --dearmor -o "$key_file"
-	echo "$repo_url" | sudo tee "$repo_file" >/dev/null
+	curl -fsSL "$key_url" | gpg --dearmor -o "$key_file"
+	echo "$repo_url" | tee "$repo_file" >/dev/null
 }
 
 _rpm_setup_repo() {
+	elevate_privilege
 	local mongodb_version="${1?mongodb version required}"
 	mongodb_version="${mongodb_version%.*}"
 	local yum_mongo_url="https://repo.mongodb.org/yum/redhat/$DISTRO_VERSION/mongodb-org/$mongodb_version/x86_64/"
 	local yum_key="https://www.mongodb.org/static/pgp/server-$mongodb_version.asc"
 	INFO "saving repository data to file"
-	cat <<EOF | sudo tee -a "/etc/yum.repos.d/mongodb-org-$mongodb_version.repo"
+	cat <<EOF | tee >/dev/null "/etc/yum.repos.d/mongodb-org-$mongodb_version.repo"
 [mongodb-org-$mongodb_version]
 name=MongoDB Repository
 baseurl=$yum_mongo_url
@@ -109,6 +111,7 @@ EOF
 
 # @returns install path
 _manual_install_mongodb() {
+	elevate_privilege
 	local mongodb_version="${1?mongodb version must be passed}"
 	case "$DISTRO" in
 	debian | ubuntu)
