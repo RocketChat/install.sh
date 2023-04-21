@@ -23,6 +23,7 @@ OPTIONS
   upgrade-rocketchatctl     Upgrade the rocketchatctl command line tool
   configure                 Configures RocketChat server and Let's Encrypt
   backup                    Makes a rocketchat database backup
+  uninstall									Uninstall Rocketchat server (prompts for node,mongo and proxy as well)
 
 FOR UNATTENDED INSTALLATION
   --root-url=ROOT_URL       the public URL where RocketChat server will be accessible on the Internet (REQUIRED)
@@ -75,7 +76,14 @@ error_with_no_value_specified() {
 }
 
 print_distro_not_supported_error_and_exit() {
-  errcho "The detected Linux distribution is not supported by rocketchatctl."
+  errcho "The detected Linux distribution is not supported by rocketchatctl.
+  Currently, we only support the following Distributions and releases
+  
+  Ubuntu:     18.04,19.04,19.10,20.04,21.04,21.10,22.04
+  Debian:     9,10,11
+  CentOS:     7,8
+  Almalinux:  8,9
+  RockyLinux: 8,9"
   exit 1
 }
 
@@ -215,6 +223,8 @@ get_os_distro() {
     distro="$(. /etc/os-release && echo "$ID")"
     distro_version="$(. /etc/os-release && echo "$VERSION_ID")"
     distro_codename="$(. /etc/os-release && echo ${VERSION_CODENAME:-})"
+    #get the major distro version (ie: 8,9,10) for mongo repos (yum)
+    distro_major="$(cut -d '.' -f 1 <<< $distro_version)"
   fi
 }
 
@@ -222,7 +232,7 @@ os_supported() {
   get_os_distro
   case "$distro" in
     ubuntu)
-      [[ "$distro_version" =~ (("18.04"|"19.04"|"19.10"|"20.04"|"21.04"|"21.10")) ]] || print_distro_not_supported_error_and_exit
+      [[ "$distro_version" =~ (("18.04"|"19.04"|"19.10"|"20.04"|"21.04"|"21.10"|"22.04")) ]] || print_distro_not_supported_error_and_exit
       ;;
     debian)
       [[ "$distro_version" =~ (("9"|"10"|"11")) ]] || print_distro_not_supported_error_and_exit
@@ -230,6 +240,12 @@ os_supported() {
     centos)
       [[ "$distro_version" =~ (("7"|"8")) ]] || print_distro_not_supported_error_and_exit
       ;;
+    almalinux)
+      [[ "$distro_version" =~ (("8"|"9")) ]] || print_distro_not_supported_error_and_exit
+      ;;
+    rocky)
+      [[ "$distro_version" =~ (("8"|"9")) ]] || print_distro_not_supported_error_and_exit
+      ;;  
     *)
       print_distro_not_supported_error_and_exit
       ;;
@@ -376,7 +392,8 @@ apt_configure_mongo() {
 }
 
 yum_configure_mongo() {
-  local yum_mongo_url="https://repo.mongodb.org/yum/redhat/$distro_version/mongodb-org/$MONGO_VERSION_WITHOUT_PATCH/x86_64/"
+	
+  local yum_mongo_url="https://repo.mongodb.org/yum/redhat/$distro_major/mongodb-org/$MONGO_VERSION_WITHOUT_PATCH/x86_64/"
   local yum_key="https://www.mongodb.org/static/pgp/server-$MONGO_VERSION_WITHOUT_PATCH.asc"
   cat << EOF | tee -a /etc/yum.repos.d/mongodb-org-$MONGO_VERSION_WITHOUT_PATCH.repo
 [mongodb-org-$MONGO_VERSION_WITHOUT_PATCH]
@@ -427,6 +444,9 @@ initiate_and_start_mongo() {
   systemctl daemon-reload
   systemctl enable mongod
   systemctl start mongod
+    		if [ -f "/usr/bin/mongosh" ]; then	
+  		ln -s /usr/bin/mongosh /usr/bin/mongo
+			fi
   if [[ -n $(pgrep mongod) ]]; then
     mongo --eval "printjson(rs.initiate())" >&2
   fi
@@ -777,6 +797,18 @@ do_setup() {
         yum install -y epel-release
         yum install GraphicsMagick jq -y
       ;;
+    almalinux)
+        dnf -y check-update || true
+        yum install gcc-c++ make curl -y
+        yum install -y epel-release
+        yum install GraphicsMagick jq -y
+      ;;
+    rocky)
+        dnf -y check-update || true
+        yum install gcc-c++ make curl -y
+        yum install -y epel-release
+        yum install GraphicsMagick jq -y
+     ;;  
   esac
 
   # node
@@ -828,6 +860,20 @@ do_install_mongo() {
         initiate_and_start_mongo
       ;;
       centos)
+        yum_configure_mongo
+        yum_install_mongo
+        configure_mongo
+        create_mongo_systemd_file
+        initiate_and_start_mongo
+      ;;
+      almalinux)
+        yum_configure_mongo
+        yum_install_mongo
+        configure_mongo
+        create_mongo_systemd_file
+        initiate_and_start_mongo
+      ;;
+      rocky)
         yum_configure_mongo
         yum_install_mongo
         configure_mongo
@@ -1177,6 +1223,120 @@ do_install_node() {
     NODE_BIN=$(nvm which $NODE_VERSION)
   fi
 }
+		do_remove_node(){
+		rm -rf /opt/nvm/
+		}
+		apt_remove_mongodb()
+		{
+		rm -rf /usr/share/keyrings/mongodb-org-6.0.gpg
+		apt-get -y   --allow-change-held-packages remove mongodb-database-tools mongodb-mongosh mongodb-org-database-tools-extra mongodb-org-database mongodb-org-mongos mongodb-org-server mongodb-org-shell mongodb-org-tools mongodb-org
+		rm -rf /etc/apt/apt.sources.list.d/*mongo*
+		rm -rf /var/lib/mongodb
+		}
+yum_remove_mongodb()
+{
+	systemctl disable mongod
+	systemctl stop mongod
+	dnf -y remove mongodb-org-server mongodb-org mongodb-org-shell mongodb-org-mongos mongodb-org-tools mongodb-org-database-tools-extra mongodb-database-tools
+	
+	rm -rf /etc/yum.repos.d/mongodb-org*
+}
+do_uninstall(){
+	get_os_distro
+		#does the file exist?
+		   if ! [ -d ${ROCKETCHAT_DIR} ]; then
+				echo "Rocket Chat does not seem to be installed!"
+		    exit
+		   fi
+		 
+		
+		if [ -f "/etc/systemd/system/multi-user.target.wants/caddy.service" ]; then
+			#verify removal of caddy
+			echo -n "Remove caddy files? [y/N] "
+			read yn
+				if [ $yn == "y" ];then
+					systemctl disable caddy
+					systemctl stop caddy
+					rm -rf /etc/systemd/system/multi-user.target.wants/caddy.service
+					rm -rf /etc/caddy
+					rm -rf /usr/lib/systemd/system/caddy.service
+					
+					userdel caddy
+					rm -rf /home/caddy
+					rm -rf /usr/local/bin/caddy
+			
+				fi
+			
+			fi
+		if [ -f "/etc/systemd/system/multi-user.target.wants/traefik.service" ]; then		
+		echo -n "Remove traefik files? [y/N] "
+			read traef
+				if [ $traef == "y" ];then
+					systemctl disable traefik
+					systemctl stop traefik
+					rm -rf /etc/systemd/system/multi-user.target.wants/traefik.service
+					rm -rf /etc/systemd/system/multi-user.target.wants/traefik.service
+					rm -rf /etc/traefik
+					rm -rf /usr/local/bin/traefik
+					rm -rf /usr/lib/systemd/system/traefik.service
+					userdel traefik
+					rm -rf /home/traefik
+				fi
+			fi
+   echo -n "Remove the database? [y/N]"		
+       read dbyn
+        if [ $dbyn == "y" ];then
+        echo -n "This will remove your Mongo database. The mongo server will still exist. Please confirm you wish to remove the database!! [y/N]"
+					read dbconfirm
+					if [ $dbconfirm == "y" ];then
+		   		echo "db.dropDatabase()" | mongo rocketchat >> /dev/null
+		   		fi
+       fi
+		if [ -f "/usr/lib/systemd/system/mongod.service" ]; then		
+		echo -n""
+		echo -n "Remove Mongo Service?? [y/N] "
+		    read mongoyn
+				if [ $mongoyn == "y" ];then
+					echo -n "This will remove your databases and everything related to mongo. Please confirm you wish to remove Mongo!! [y/N]"
+					read mongoconfirm
+					  if [ $mongoconfirm == "y" ];then
+				    systemctl disable mongod
+				    systemctl stop mongod
+				    rm -rf /usr/lib/systemd/system/mongod.service
+				    rm -rf /etc/systemd/system/mongod.service.d/mongod.conf
+				    systemctl reset-failed
+				      case "$distro" in
+               ubuntu | debian)
+               apt_remove_mongodb
+              ;;
+               centos|almalinux|rocky)
+               yum_remove_mongodb
+              ;;
+              esac				       
+				    fi
+				fi
+		fi
+		if [ -d "/opt/nvm/" ]; then				
+		echo -n "Remove Node? [y/N] "
+		    read nodeyn
+			    if [ $nodeyn == "y" ];then
+					do_remove_node
+				fi
+		fi
+		if [ -f "/etc/systemd/system/multi-user.target.wants/rocketchat.service" ]; then				
+		systemctl disable rocketchat
+		systemctl stop rocketchat
+		rm -rf /etc/systemd/system/multi-user.target.wants/rocketchat.service
+		rm -rf /usr/lib/systemd/system/rocketchat.service
+	  fi
+		rm -rf /opt/Rocket.Chat
+		userdel rocketchat
+		rm -rf /home/rocketchat
+		systemctl reset-failed
+
+		}
+
+
 
 main() {
   local VERSION="latest"
@@ -1261,6 +1421,9 @@ main() {
       check_arguments_backup "$@"
       do_backup
       ;;
+    uninstall)
+	    do_uninstall
+	    ;;
     *)
       show_help
       exit 2
@@ -1268,5 +1431,6 @@ main() {
   esac
 
 }
+
 
 main "$@"
